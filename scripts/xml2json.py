@@ -13,6 +13,8 @@ import xmltodict
 import xmlschema
 import dateparser
 import datetime as dt
+import typedload
+import namedtupled
 from rich.progress import track
 from itertools import chain
 from functools import partial
@@ -20,6 +22,7 @@ from pprint import pprint
 from xml.etree.ElementTree import ElementTree
 from pathlib import Path
 from typing import Dict, List, NamedTuple, Tuple, Any, TextIO, Optional
+
 
 
 class Args(NamedTuple):
@@ -57,6 +60,12 @@ class Enrollment(NamedTuple):
     value: int
 
 
+class Reference(NamedTuple):
+    """ Reference """
+    citation: str
+    pmid: int
+
+
 class ProtocolOutcome(NamedTuple):
     """ ProtocolOutcome """
     measure: str
@@ -64,11 +73,57 @@ class ProtocolOutcome(NamedTuple):
     description: str
 
 
+class Contact(NamedTuple):
+    """ Contact """
+    first_name: str
+    middle_name: str
+    last_name: str
+    degrees: str
+    phone: str
+    phone_ext: str
+    email: str
+
+
+class Investigator(NamedTuple):
+    """ Investigator """
+    first_name: str
+    middle_name: str
+    last_name: str
+    degrees: str
+    role: str
+    affiliation: str
+
+
 class ArmGroup(NamedTuple):
     """ ArmGroup """
     arm_group_label: str
     arm_group_type: str
     description: str
+
+
+class StudyDoc(NamedTuple):
+    """ StudyDoc """
+    doc_id: str
+    doc_type: str
+    doc_url: str
+    doc_comment: str
+
+
+class ProvidedDocument(NamedTuple):
+    """ ProvidedDocument """
+    document_type: str
+    document_has_protocol: str
+    document_has_icf: str
+    document_has_sap: str
+    document_date: str
+    document_url: str
+
+
+class PendingResult(NamedTuple):
+    """ PendingResult """
+    submitted: str
+    returned: str
+    submission_canceled: str
 
 
 class Eligibility(NamedTuple):
@@ -101,6 +156,7 @@ class Study(NamedTuple):
     official_title: str
     acronym: str
     source: str
+    rank: str
     brief_summary: str
     detailed_description: str
     overall_status: str
@@ -108,6 +164,19 @@ class Study(NamedTuple):
     why_stopped: str
     start_date: str
     completion_date: str
+    verification_date: str
+    study_first_submitted: str
+    study_first_submitted_qc: str
+    study_first_posted: str
+    results_first_submitted: str
+    results_first_submitted_qc: str
+    results_first_posted: str
+    disposition_first_submitted: str
+    disposition_first_submitted_qc: str
+    disposition_first_posted: str
+    last_update_submitted: str
+    last_update_submitted_qc: str
+    last_update_posted: str
     primary_completion_date: str
     phase: str
     study_type: str
@@ -116,6 +185,7 @@ class Study(NamedTuple):
     biospec_retention: str
     biospec_description: str
     conditions: List[str]
+    keywords: List[str]
     eligibility: Optional[Eligibility]
     number_of_arms: Optional[int]
     number_of_groups: Optional[int]
@@ -127,6 +197,16 @@ class Study(NamedTuple):
     other_outcomes: List[ProtocolOutcome]
     arm_groups: List[ArmGroup]
     interventions: List[Intervention]
+    interventions: List[Intervention]
+    overall_official: List[Investigator]
+    overall_contact: Optional[Contact]
+    overall_contact_backup: Optional[Contact]
+    references: List[Reference]
+    condition_browse: List[str]
+    intervention_browse: List[str]
+    study_docs: List[str]
+    provided_documents: List[ProvidedDocument]
+    # pending_results: List[PendingResult]
 
 
 # class Sponsor(NamedTuple):
@@ -203,7 +283,7 @@ def main() -> None:
         basename = os.path.basename(file)
         root = os.path.splitext(basename)[0]
         out_file = os.path.join(args.outdir, root + '.json')
-        print(file)
+        # print(file)
 
         # Skip existing files
         # if os.path.isfile(out_file):
@@ -217,11 +297,11 @@ def main() -> None:
             set(chain.from_iterable((map(words, flatten(tree))))))
 
         study = restructure(xml)
-        pprint(str(study))
+        pprint(json.dumps(study))
 
         # Convert to JSON
         out_fh = open(out_file, 'wt')
-        out_fh.write(json.dumps(xml, indent=4) + '\n')
+        out_fh.write(json.dumps(typedload.dump(study), indent=4) + '\n')
         out_fh.close()
         num_written += 1
         break
@@ -366,6 +446,19 @@ def get_protocols(xml: Dict[str, Any], fld: str) -> List[ProtocolOutcome]:
 
 
 # --------------------------------------------------
+def get_references(xml: Dict[str, Any], fld: str) -> List[Reference]:
+    """ Get references """
+
+    refs = []
+    if fld in xml:
+        for val in xml[fld]:
+            refs += Reference(citation=val.get('citation', ''),
+                              pmid=val.get('pmid', 0))
+
+    return refs
+
+
+# --------------------------------------------------
 def get_interventions(xml: Dict[str, Any], fld: str) -> List[Intervention]:
     """ Get Intervention """
 
@@ -381,21 +474,120 @@ def get_interventions(xml: Dict[str, Any], fld: str) -> List[Intervention]:
 
     return ints
 
+
+# --------------------------------------------------
+def get_investigators(xml: Dict[str, Any], fld: str) -> List[Investigator]:
+    """ Get investigators """
+
+    invs = []
+    if fld in xml:
+        for val in xml[fld]:
+            invs += Investigator(first_name=val.get('first_name', ''),
+                                 middle_name=val.get('middle_name', ''),
+                                 last_name=val.get('last_name', ''),
+                                 degrees=val.get('degrees', ''),
+                                 role=val.get('role', ''),
+                                 affiliation=val.get('affiliation', ''))
+
+    return invs
+
+
+# --------------------------------------------------
+def get_contact(xml: Dict[str, Any], fld: str) -> Optional[Contact]:
+    """ Get contacts """
+
+    if val := xml.get(fld):
+        return Contact(first_name=val.get('first_name', ''),
+                       middle_name=val.get('middle_name', ''),
+                       last_name=val.get('last_name', ''),
+                       degrees=val.get('degrees', ''),
+                       phone=val.get('phone', ''),
+                       phone_ext=val.get('phone_ext', ''),
+                       email=val.get('email', ''))
+
+
 # --------------------------------------------------
 def get_eligibility(xml, fld) -> Optional[Eligibility]:
     """ Get eligibility """
+    def textblock(x):
+        text = x.get('textblock', '') if isinstance(x, dict) else x
+        return re.sub('\s+', ' ', text).strip()
 
     if val := xml.get(fld):
-        return Eligibility(
-            study_pop=val.get('study_pop', ''),
-            sampling_method=val.get('sampling_method', ''),
-            criteria=val.get('', ''),
-            gender=val.get('', ''),
-            gender_based=val.get('', ''),
-            gender_description=val.get('', ''),
-            minimum_age=val.get('', ''),
-            maximum_age=val.get('', ''),
-            healthy_volunteers=val.get('', ''))
+        return Eligibility(study_pop=textblock(val.get('study_pop', '')),
+                           sampling_method=val.get('sampling_method', ''),
+                           criteria=textblock(val.get('criteria', '')),
+                           gender=val.get('gender', ''),
+                           gender_based=val.get('gender_based', ''),
+                           gender_description=val.get('gender_description',
+                                                      ''),
+                           minimum_age=val.get('minimum_age', ''),
+                           maximum_age=val.get('maximum_age', ''),
+                           healthy_volunteers=val.get('healthy_volunteers',
+                                                      ''))
+
+
+# --------------------------------------------------
+def get_browse_struct(xml, fld) -> List[str]:
+    """ Get condition_browse """
+
+    if val := xml.get(fld):
+        return val.get('mesh_term')
+
+    return []
+
+
+# --------------------------------------------------
+def get_study_docs(xml, fld) -> List[StudyDoc]:
+    """ Get study_docs """
+
+    docs = []
+    if fld in xml:
+        for val in xml.get(fld).get('study_doc'):
+            docs += StudyDoc(doc_id=val.get('doc_id', ''),
+                             doc_type=val.get('doc_type', ''),
+                             doc_url=val.get('doc_url', ''),
+                             doc_comment=val.get('doc_comment', ''))
+
+    return docs
+
+
+# --------------------------------------------------
+# def get_pending_results(xml, fld) -> List[PendingResult]:
+#     """
+#     Get pending_results
+#     {'submitted': ['December 2, 2020']}
+#     """
+#
+#     results = []
+#     print(xml.get(fld))
+#     if fld in xml:
+#         for val in xml.get(fld):
+#             results += PendingResult(submitted=get_date(val.get('submitted')),
+#                                      returned=get_date(val.get('returned')),
+#                                      submission_canceled=get_date(
+#                                          val.get('submission_canceled')))
+
+#     return results
+
+
+# --------------------------------------------------
+def get_provided_documents(xml, fld) -> List[ProvidedDocument]:
+    """ Get provided_documents """
+
+    docs = []
+    if fld in xml:
+        for val in xml.get(fld).get('provided_document'):
+            docs += ProvidedDocument(
+                document_type=val.get('document_type'),
+                document_has_protocol=val.get('document_has_protocol', ''),
+                document_has_icf=val.get('document_has_icf', ''),
+                document_has_sap=val.get('document_has_sap', ''),
+                document_date=val.get('document_date', ''),
+                document_url=val.get('document_url', ''))
+
+    return docs
+
 
 # --------------------------------------------------
 def get_enrollment(xml) -> Optional[Enrollment]:
@@ -435,6 +627,7 @@ def restructure(xml) -> Study:
         official_title=xml.get('official_title', ''),
         acronym=xml.get('acronym', ''),
         source=xml.get('source', ''),
+        rank=xml.get('rank', ''),
         brief_summary=get_textblock(xml, 'brief_summary'),
         detailed_description=get_textblock(xml, 'detailed_description'),
         overall_status=xml.get('overall_status', ''),
@@ -442,8 +635,28 @@ def restructure(xml) -> Study:
         why_stopped=xml.get('why_stopped', ''),
         start_date=get_date(xml.get('start_date', '')),
         completion_date=get_date(xml.get('completion_date', '')),
+        verification_date=get_date(xml.get('verification_date', '')),
         primary_completion_date=get_date(xml.get('primary_completion_date',
                                                  '')),
+        study_first_submitted=get_date(xml.get('study_first_submitted', '')),
+        study_first_submitted_qc=get_date(
+            xml.get('study_first_submitted_qc', '')),
+        study_first_posted=get_date(xml.get('study_first_posted', '')),
+        results_first_submitted=get_date(xml.get('results_first_submitted',
+                                                 '')),
+        results_first_submitted_qc=get_date(
+            xml.get('results_first_submitted_qc', '')),
+        results_first_posted=get_date(xml.get('results_first_posted', '')),
+        disposition_first_submitted=get_date(
+            xml.get('disposition_first_submitted', '')),
+        disposition_first_submitted_qc=get_date(
+            xml.get('disposition_first_submitted_qc', '')),
+        disposition_first_posted=get_date(
+            xml.get('disposition_first_posted', '')),
+        last_update_submitted=get_date(xml.get('last_update_submitted', '')),
+        last_update_submitted_qc=get_date(
+            xml.get('last_update_submitted_qc', '')),
+        last_update_posted=get_date(xml.get('last_update_posted', '')),
         phase=xml.get('phase', ''),
         study_type=xml.get('study_type', ''),
         has_expanded_access=xml.get('has_expanded_access', ''),
@@ -461,7 +674,19 @@ def restructure(xml) -> Study:
         secondary_outcomes=get_protocols(xml, 'secondary_outcome'),
         other_outcomes=get_protocols(xml, 'other_outcome'),
         arm_groups=get_arm_groups(xml, 'arm_group'),
-        interventions=get_interventions(xml, 'intervention'))
+        interventions=get_interventions(xml, 'intervention'),
+        overall_official=get_investigators(xml, 'investigator'),
+        overall_contact=get_contact(xml, 'overall_contact'),
+        overall_contact_backup=get_contact(xml, 'overall_contact_backup'),
+        references=get_references(xml, 'reference'),
+        keywords=get_str_list(xml, 'keyword'),
+        condition_browse=get_browse_struct(xml, 'condition_browse'),
+        intervention_browse=get_browse_struct(xml, 'intervention_browse'),
+        study_docs=get_study_docs(xml, 'study_docs'),
+        provided_documents=get_provided_documents(xml,
+                                                  'provided_document_section'))
+
+    # pending_results=get_pending_results(xml, 'pending_results'))
 
 
 # --------------------------------------------------
