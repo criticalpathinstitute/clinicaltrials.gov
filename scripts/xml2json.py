@@ -21,8 +21,7 @@ from functools import partial
 from pprint import pprint
 from xml.etree.ElementTree import ElementTree
 from pathlib import Path
-from typing import Dict, List, NamedTuple, Tuple, Any, TextIO, Optional
-
+from typing import Dict, List, NamedTuple, TypedDict, Tuple, Any, TextIO, Optional
 
 
 class Args(NamedTuple):
@@ -32,7 +31,7 @@ class Args(NamedTuple):
     schema: TextIO
 
 
-class OversightInfo(NamedTuple):
+class OversightInfo(TypedDict):
     """ OversightInfo """
     has_dmc: str
     is_fda_regulated_drug: str
@@ -42,7 +41,7 @@ class OversightInfo(NamedTuple):
     is_us_export: str
 
 
-class StudyDesign(NamedTuple):
+class StudyDesign(TypedDict):
     """ StudyDesign """
     allocation: str
     intervention_model: str
@@ -54,26 +53,26 @@ class StudyDesign(NamedTuple):
     masking_description: str
 
 
-class Enrollment(NamedTuple):
+class Enrollment(TypedDict):
     """ Enrollment """
     enrollment_type: str
     value: int
 
 
-class Reference(NamedTuple):
+class Reference(TypedDict):
     """ Reference """
     citation: str
     pmid: int
 
 
-class ProtocolOutcome(NamedTuple):
+class ProtocolOutcome(TypedDict):
     """ ProtocolOutcome """
     measure: str
     time_frame: str
     description: str
 
 
-class Contact(NamedTuple):
+class Contact(TypedDict):
     """ Contact """
     first_name: str
     middle_name: str
@@ -84,7 +83,7 @@ class Contact(NamedTuple):
     email: str
 
 
-class Investigator(NamedTuple):
+class Investigator(TypedDict):
     """ Investigator """
     first_name: str
     middle_name: str
@@ -94,14 +93,14 @@ class Investigator(NamedTuple):
     affiliation: str
 
 
-class ArmGroup(NamedTuple):
+class ArmGroup(TypedDict):
     """ ArmGroup """
     arm_group_label: str
     arm_group_type: str
     description: str
 
 
-class StudyDoc(NamedTuple):
+class StudyDoc(TypedDict):
     """ StudyDoc """
     doc_id: str
     doc_type: str
@@ -109,7 +108,7 @@ class StudyDoc(NamedTuple):
     doc_comment: str
 
 
-class ProvidedDocument(NamedTuple):
+class ProvidedDocument(TypedDict):
     """ ProvidedDocument """
     document_type: str
     document_has_protocol: str
@@ -119,14 +118,14 @@ class ProvidedDocument(NamedTuple):
     document_url: str
 
 
-class PendingResult(NamedTuple):
+class PendingResult(TypedDict):
     """ PendingResult """
     submitted: str
     returned: str
     submission_canceled: str
 
 
-class Eligibility(NamedTuple):
+class Eligibility(TypedDict):
     """ Eligibility """
     study_pop: str
     sampling_method: str
@@ -139,7 +138,7 @@ class Eligibility(NamedTuple):
     healthy_volunteers: str
 
 
-class Intervention(NamedTuple):
+class Intervention(TypedDict):
     """ Intervention """
     intervention_type: str
     intervention_name: str
@@ -148,7 +147,7 @@ class Intervention(NamedTuple):
     other_name: Optional[List[str]]
 
 
-class Study(NamedTuple):
+class Study(TypedDict):
     """ Study """
     nct_id: str
     org_study_id: str
@@ -209,7 +208,7 @@ class Study(NamedTuple):
     # pending_results: List[PendingResult]
 
 
-# class Sponsor(NamedTuple):
+# class Sponsor(TypedDict):
 #     """ Sponsor """
 #     sponsor_type: str
 #     agency: str
@@ -297,14 +296,14 @@ def main() -> None:
             set(chain.from_iterable((map(words, flatten(tree))))))
 
         study = restructure(xml)
-        pprint(json.dumps(study))
+        # pprint(study)
 
         # Convert to JSON
         out_fh = open(out_file, 'wt')
         out_fh.write(json.dumps(typedload.dump(study), indent=4) + '\n')
         out_fh.close()
         num_written += 1
-        break
+        # break
 
     print(f'Done, wrote {num_written:,} to "{args.outdir}".')
 
@@ -422,11 +421,11 @@ def get_arm_groups(xml: Dict[str, Any], fld: str) -> List[ArmGroup]:
 
     groups = []
     if fld in xml:
-        for group in xml[fld]:
-            groups += ArmGroup(arm_group_label=group.get(
-                'arm_group_label', ''),
-                               arm_group_type=group.get('arm_group_type', ''),
-                               description=group.get('description', ''))
+        for group in xml.get(fld):
+            groups.append(
+                ArmGroup(arm_group_label=group.get('arm_group_label', ''),
+                         arm_group_type=group.get('arm_group_type', ''),
+                         description=group.get('description', '')))
 
     return groups
 
@@ -438,9 +437,10 @@ def get_protocols(xml: Dict[str, Any], fld: str) -> List[ProtocolOutcome]:
     protocols = []
     if fld in xml:
         for protocol in xml[fld]:
-            protocols += ProtocolOutcome(measure=protocol['measure'],
-                                         time_frame=protocol['time_frame'],
-                                         description=protocol['description'])
+            protocols.append(
+                ProtocolOutcome(measure=protocol.get('measure', ''),
+                                time_frame=protocol.get('time_frame', ''),
+                                description=protocol.get('description', '')))
 
     return protocols
 
@@ -452,8 +452,9 @@ def get_references(xml: Dict[str, Any], fld: str) -> List[Reference]:
     refs = []
     if fld in xml:
         for val in xml[fld]:
-            refs += Reference(citation=val.get('citation', ''),
-                              pmid=val.get('pmid', 0))
+            refs.append(
+                Reference(citation=val.get('citation', ''),
+                          pmid=val.get('pmid', 0)))
 
     return refs
 
@@ -465,12 +466,14 @@ def get_interventions(xml: Dict[str, Any], fld: str) -> List[Intervention]:
     ints = []
     if fld in xml:
         for val in xml[fld]:
-            ints += Intervention(
-                intervention_type=val.get('intervention_type', ''),
-                intervention_name=val.get('intervention_name', ''),
-                description=val.get('description', ''),
-                arm_group_label=val.get('arm_group_label'),
-                other_name=val.get('other_name'))
+            ints.append(
+                Intervention(intervention_type=val.get('intervention_type',
+                                                       ''),
+                             intervention_name=val.get('intervention_name',
+                                                       ''),
+                             description=val.get('description', ''),
+                             arm_group_label=val.get('arm_group_label'),
+                             other_name=val.get('other_name')))
 
     return ints
 
@@ -482,12 +485,13 @@ def get_investigators(xml: Dict[str, Any], fld: str) -> List[Investigator]:
     invs = []
     if fld in xml:
         for val in xml[fld]:
-            invs += Investigator(first_name=val.get('first_name', ''),
-                                 middle_name=val.get('middle_name', ''),
-                                 last_name=val.get('last_name', ''),
-                                 degrees=val.get('degrees', ''),
-                                 role=val.get('role', ''),
-                                 affiliation=val.get('affiliation', ''))
+            invs.append(
+                Investigator(first_name=val.get('first_name', ''),
+                             middle_name=val.get('middle_name', ''),
+                             last_name=val.get('last_name', ''),
+                             degrees=val.get('degrees', ''),
+                             role=val.get('role', ''),
+                             affiliation=val.get('affiliation', '')))
 
     return invs
 
@@ -544,10 +548,11 @@ def get_study_docs(xml, fld) -> List[StudyDoc]:
     docs = []
     if fld in xml:
         for val in xml.get(fld).get('study_doc'):
-            docs += StudyDoc(doc_id=val.get('doc_id', ''),
-                             doc_type=val.get('doc_type', ''),
-                             doc_url=val.get('doc_url', ''),
-                             doc_comment=val.get('doc_comment', ''))
+            docs.append(
+                StudyDoc(doc_id=val.get('doc_id', ''),
+                         doc_type=val.get('doc_type', ''),
+                         doc_url=val.get('doc_url', ''),
+                         doc_comment=val.get('doc_comment', '')))
 
     return docs
 
@@ -578,13 +583,14 @@ def get_provided_documents(xml, fld) -> List[ProvidedDocument]:
     docs = []
     if fld in xml:
         for val in xml.get(fld).get('provided_document'):
-            docs += ProvidedDocument(
-                document_type=val.get('document_type'),
-                document_has_protocol=val.get('document_has_protocol', ''),
-                document_has_icf=val.get('document_has_icf', ''),
-                document_has_sap=val.get('document_has_sap', ''),
-                document_date=val.get('document_date', ''),
-                document_url=val.get('document_url', ''))
+            docs.append(
+                ProvidedDocument(
+                    document_type=val.get('document_type'),
+                    document_has_protocol=val.get('document_has_protocol', ''),
+                    document_has_icf=val.get('document_has_icf', ''),
+                    document_has_sap=val.get('document_has_sap', ''),
+                    document_date=val.get('document_date', ''),
+                    document_url=val.get('document_url', '')))
 
     return docs
 
