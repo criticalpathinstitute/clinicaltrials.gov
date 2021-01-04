@@ -6,15 +6,16 @@ Purpose: Rock the Casbah
 """
 
 import argparse
-import json
-import os
-import re
-import xmltodict
-import xmlschema
 import dateparser
 import datetime as dt
-import typedload
+import json
 import namedtupled
+import os
+import re
+import sys
+import typedload
+import xmlschema
+import xmltodict
 from rich.progress import track
 from itertools import chain
 from functools import partial
@@ -183,6 +184,7 @@ class Study(TypedDict):
     target_duration: str
     biospec_retention: str
     biospec_description: str
+    text: str
     conditions: List[str]
     keywords: List[str]
     eligibility: Optional[Eligibility]
@@ -271,12 +273,13 @@ def main() -> None:
     """ Make a jazz noise here """
 
     args = get_args()
-    schema = xmlschema.XMLSchema(args.schema)
-
+    schema = xmlschema.XMLSchema(args.schema.name)
     num_files = len(list(args.files))
+
     print(f'Processing {num_files:,} file{"" if num_files == 1 else "s"}.')
 
     num_written = 0
+    errors = []
     for file in track(args.files, description="Processing..."):
         # Determine outfile
         basename = os.path.basename(file)
@@ -290,12 +293,18 @@ def main() -> None:
 
         # Set the "text" to all the distinct words
         # xml = xmltodict.parse(open(file).read())
-        xml = schema.to_dict(open(file).read())
+
+        xml = open(file).read()
+        if not schema.is_valid(xml):
+            errors.append(f'Invalid document "{file}"')
+            continue
+
+        data = schema.to_dict(xml)
         tree = ElementTree().parse(file)
-        xml['text'] = ' '.join(
+        all_text = ' '.join(
             set(chain.from_iterable((map(words, flatten(tree))))))
 
-        study = restructure(xml)
+        study = restructure(data, all_text)
         # pprint(study)
 
         # Convert to JSON
@@ -305,14 +314,18 @@ def main() -> None:
         num_written += 1
         # break
 
+    if errors:
+        print('\n'.join(['ERRORS:'] + errors))
+
     print(f'Done, wrote {num_written:,} to "{args.outdir}".')
 
 
 # --------------------------------------------------
 def words(t: Tuple[Any, str]) -> List[str]:
     """ Return the words from the tuple value """
-
-    clean = partial(re.sub, '[^a-zA-Z0-9._-]', '')
+    def clean(s):
+        s = re.sub('[\s_-]+', ' ', s)
+        return re.sub('[^a-zA-Z0-9.\s]', '', s)
 
     def stop(word):
         # digit
@@ -623,7 +636,7 @@ def get_str_list(xml, fld) -> List[str]:
 
 
 # --------------------------------------------------
-def restructure(xml) -> Study:
+def restructure(xml: str, all_text: str) -> Study:
     """ Restructure XML """
 
     return Study(
@@ -690,7 +703,8 @@ def restructure(xml) -> Study:
         intervention_browse=get_browse_struct(xml, 'intervention_browse'),
         study_docs=get_study_docs(xml, 'study_docs'),
         provided_documents=get_provided_documents(xml,
-                                                  'provided_document_section'))
+                                                  'provided_document_section'),
+        text=all_text)
 
     # pending_results=get_pending_results(xml, 'pending_results'))
 

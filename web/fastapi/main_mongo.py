@@ -1,7 +1,4 @@
 import os
-import psycopg2
-import psycopg2.extras
-from ct import Study, Condition, StudyToCondition
 from configparser import ConfigParser
 from fastapi import FastAPI
 from pymongo import MongoClient
@@ -53,7 +50,30 @@ class Summary(BaseModel):
     num_studies: int
 
 
-dbh = psycopg2.connect('dbname=ct user=kyclark password="g0p3rl!"')
+# --------------------------------------------------
+def spelunk(path: str, rec: dict) -> str:
+    """ Dive into dict struct """
+
+    path = path.split('.')
+
+    while path:
+        node = path.pop(0)
+        if not isinstance(rec, dict) or node not in rec:
+            return ''
+        rec = rec.get(node)
+
+    return rec
+
+
+# --------------------------------------------------
+def test_spelunk() -> None:
+    """ Test spelunk """
+
+    assert spelunk('', {}) == ''
+    assert spelunk('foo', {'foo': 3}) == 3
+    assert spelunk('foo.bar', {'foo': 3}) == ''
+    assert spelunk('foo.bar', {'foo': {'bar': 'hey'}}) == 'hey'
+
 
 # --------------------------------------------------
 @app.get('/search/{term}', response_model=List[StudySearchResult])
@@ -63,18 +83,11 @@ def search(term: str):
         return StudySearchResult(nct_id=rec['nct_id'],
                                  title=rec['official_title'])
 
-    cur = dbh.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    sql = f"""
-        select nct_id, official_title as title
-        from   study
-        where  text @@ to_tsquery('{term}');
-    """
-    cur.execute(sql)
-    res = cur.fetchall()
-    studies = list(map(lambda r: StudySearchResult(**dict(r)), res))
-    cur.close()
-
-    return studies
+    flds = ['nct_id', 'official_title']
+    proj = {fld: 1 for fld in flds}
+    return list(map(f, mongo_db['ct'].find({"$text": {
+        "$search": term
+    }}, proj)))
 
 
 # --------------------------------------------------
@@ -90,10 +103,12 @@ def summary():
 def study(nct_id: str) -> StudyDetail:
     """ Study details """
 
-    if studies := list(Study.select().where(Study.nct_id == nct_id)):
-        study = studies[0]
-        return StudyDetail(nct_id=study.nct_id,
-                           title=study.official_title)
+    res = mongo_db['ct'].find({'nct_id': nct_id})
+
+    if res.count() == 1:
+        study = res.next()
+        return StudyDetail(nct_id=study['nct_id'],
+                           title=study['official_title'])
 
 
 # --------------------------------------------------
