@@ -1,0 +1,56 @@
+drop table if exists study;
+create table study (
+    study_id SERIAL PRIMARY KEY,
+    nct_id text,
+    org_study_id text,
+    brief_title text,
+    official_title text,
+    acronym text,
+    source text,
+    rank text,
+    brief_summary text,
+    detailed_description text,
+    overall_status text,
+    last_known_status text,
+    why_stopped text,
+    start_date text,
+    completion_date text,
+    verification_date text,
+    study_first_submitted text,
+    study_first_submitted_qc text,
+    study_first_posted text,
+    results_first_submitted text,
+    results_first_submitted_qc text,
+    results_first_posted text,
+    disposition_first_submitted text,
+    disposition_first_submitted_qc text,
+    disposition_first_posted text,
+    last_update_submitted text,
+    last_update_submitted_qc text,
+    last_update_posted text,
+    primary_completion_date text,
+    phase text,
+    study_type text,
+    has_expanded_access text,
+    target_duration text,
+    biospec_retention text,
+    biospec_description text,
+    text text
+);
+
+CREATE INDEX study_text ON study USING GIN (to_tsvector('english', text));
+
+drop table if exists condition;
+create table condition (
+    condition_id SERIAL PRIMARY KEY,
+    condition varchar(255)
+);
+
+drop table if exists study_to_condition;
+create table study_to_condition (
+    study_to_condition_id SERIAL PRIMARY KEY,
+    study_id INT NOT NULL,
+    condition_id INT NOT NULL,
+    foreign key (study_id) references study (study_id) on delete cascade,
+    foreign key (condition_id) references condition (condition_id) on delete cascade
+);
