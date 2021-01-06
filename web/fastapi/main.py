@@ -1,6 +1,13 @@
+"""
+FastAPI server for Clinical Trials
+"""
+
+import csv
+import io
 import os
 import psycopg2
 import psycopg2.extras
+from fastapi.responses import StreamingResponse
 from ct import Study, Condition, StudyToCondition
 from configparser import ConfigParser
 from fastapi import FastAPI
@@ -38,10 +45,12 @@ app.add_middleware(
 class Condition(BaseModel):
     condition: str
 
+
 class ConditionDropDown(BaseModel):
     condition_id: int
     condition: str
     num_studies: int
+
 
 class StudySearchResult(BaseModel):
     nct_id: str
@@ -59,6 +68,7 @@ class Summary(BaseModel):
 
 dbh = psycopg2.connect('dbname=ct user=kyclark password="g0p3rl!"')
 
+
 # --------------------------------------------------
 def get_cur():
     """ Get db cursor """
@@ -68,7 +78,9 @@ def get_cur():
 
 # --------------------------------------------------
 @app.get('/search', response_model=List[StudySearchResult])
-def search(text: Optional[str] = '', conditions: Optional[str] = ''):
+def search(text: Optional[str] = '',
+           conditions: Optional[str] = '',
+           download: int = 0):
     """ Search """
     def f(rec):
         return StudySearchResult(nct_id=rec['nct_id'],
@@ -79,13 +91,30 @@ def search(text: Optional[str] = '', conditions: Optional[str] = ''):
     qry = {}
 
     if text:
-        qry['$text'] = { '$search': text }
+        qry['$text'] = {'$search': text}
 
     if conditions:
-        qry['conditions'] = { '$in': conditions.split('::') }
+        qry['conditions'] = {'$in': conditions.split('::')}
 
-    if qry:
-        return list(map(f, mongo_db['ct'].find(qry, proj)))
+    res = mongo_db['ct'].find(qry, proj) if qry else []
+
+    if not res:
+        return []
+
+    if download:
+        stream = io.StringIO()
+        writer = csv.DictWriter(stream, fieldnames=flds, delimiter=',')
+        writer.writeheader()
+        for row in res:
+            writer.writerow({f: row[f] for f in flds})
+
+        response = StreamingResponse(iter([stream.getvalue()]),
+                                     media_type="text/csv")
+        response.headers[
+            "Content-Disposition"] = "attachment; filename=download.csv"
+        return response
+    else:
+        return list(map(f, res))
 
 
 # --------------------------------------------------
@@ -129,8 +158,7 @@ def study(nct_id: str) -> StudyDetail:
     """ Study details """
 
     if study := Study.query().where(Study.nct_id == nct_id):
-        return StudyDetail(nct_id=study.nct_id,
-                           title=study.official_title)
+        return StudyDetail(nct_id=study.nct_id, title=study.official_title)
 
 
 # --------------------------------------------------

@@ -1,10 +1,15 @@
 SCHEMA = ./scripts/public.xsd
+DB = ct
 
 reqs:
 	python3 -m pip install -r scripts/requirements.txt
 
 orm:
 	pwiz.py ct > scripts/ct.py
+
+dumps:
+	pg_dump $(DB) > $(DB).sql
+	mongoexport --out ct_mongo.json --db $(DB) --collection ct
 
 # 1. Download all the data
 data:

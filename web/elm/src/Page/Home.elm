@@ -12,8 +12,9 @@ import Bootstrap.Table exposing (table, tbody, td, th, thead, tr)
 import Common exposing (commify, viewHttpErrorMessage)
 import Config exposing (apiServer)
 import Debug
+import File.Download as Download
 import Html exposing (Html, a, div, h1, text)
-import Html.Attributes exposing (class, for, value)
+import Html.Attributes exposing (class, for, href, value)
 import Html.Events exposing (onInput, onSubmit)
 import Http
 import Json.Decode exposing (Decoder, field, float, int, nullable, string)
@@ -21,6 +22,7 @@ import Json.Decode.Pipeline exposing (hardcoded, optional, required)
 import Regex
 import RemoteData exposing (RemoteData, WebData)
 import Route
+import Task
 import Url.Builder
 
 
@@ -53,14 +55,15 @@ type alias Study =
 
 
 type Msg
-    = ConditionDropDownResponse (WebData (List ConditionDropDown))
+    = AddCondition String
+    | ConditionDropDownResponse (WebData (List ConditionDropDown))
+    | DoSearch
+    | Download
     | RemoveCondition String
     | SummaryResponse (WebData Summary)
-    | SetCondition String
     | SetConditionFilter String
     | SetQuery String
     | SearchResponse (WebData (List Study))
-    | DoSearch
 
 
 init : ( Model, Cmd Msg )
@@ -79,34 +82,7 @@ init =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        ConditionDropDownResponse data ->
-            ( { model | conditionsDropDown = data }
-            , Cmd.none
-            )
-
-        DoSearch ->
-            ( model, doSearch model )
-
-        RemoveCondition condition ->
-            let
-                newConditions =
-                    List.filter
-                        (\c -> c /= condition)
-                        model.selectedConditions
-            in
-            ( { model | selectedConditions = newConditions }, Cmd.none )
-
-        SummaryResponse data ->
-            ( { model | summary = data }
-            , Cmd.none
-            )
-
-        SearchResponse data ->
-            ( { model | searchResults = data }
-            , Cmd.none
-            )
-
-        SetCondition condition ->
+        AddCondition condition ->
             let
                 newCondition =
                     case String.length condition of
@@ -115,10 +91,45 @@ update msg model =
 
                         _ ->
                             [ condition ]
+
+                newModel =
+                    { model
+                        | selectedConditions =
+                            model.selectedConditions ++ newCondition
+                    }
             in
-            ( { model
-                | selectedConditions = model.selectedConditions ++ newCondition
-              }
+            ( newModel, doSearch newModel )
+
+        ConditionDropDownResponse data ->
+            ( { model | conditionsDropDown = data }
+            , Cmd.none
+            )
+
+        DoSearch ->
+            ( model, doSearch model )
+
+        Download ->
+            ( model, Download.url (searchUrl model True) )
+
+        RemoveCondition condition ->
+            let
+                newConditions =
+                    List.filter
+                        (\c -> c /= condition)
+                        model.selectedConditions
+
+                newModel =
+                    { model | selectedConditions = newConditions }
+            in
+            ( newModel, doSearch newModel )
+
+        SummaryResponse data ->
+            ( { model | summary = data }
+            , Cmd.none
+            )
+
+        SearchResponse data ->
+            ( { model | searchResults = data }
             , Cmd.none
             )
 
@@ -145,10 +156,11 @@ update msg model =
 
                         _ ->
                             Just query
+
+                newModel =
+                    { model | query = newQuery }
             in
-            ( { model | query = newQuery }
-            , Cmd.none
-            )
+            ( newModel, doSearch newModel )
 
 
 view : Model -> Html Msg
@@ -214,7 +226,9 @@ view model =
 
                         _ ->
                             Select.select
-                                [ Select.id "condition", Select.onChange SetCondition ]
+                                [ Select.id "condition"
+                                , Select.onChange AddCondition
+                                ]
                                 (empty ++ List.map mkSelectItem data)
             in
             case model.conditionsDropDown of
@@ -232,7 +246,7 @@ view model =
                 [ Button.outlinePrimary
                 , Button.onClick (RemoveCondition condition)
                 ]
-                [ text (condition ++ " [X]") ]
+                [ text (condition ++ " ⦻") ]
 
         viewSelectedConditions =
             List.map viewCondition model.selectedConditions
@@ -254,11 +268,6 @@ view model =
                      ]
                         ++ viewSelectedConditions
                     )
-                , Button.submitButton
-                    [ Button.primary
-                    , Button.attrs [ class "ml-sm-2 my-2" ]
-                    ]
-                    [ text "Go" ]
                 ]
 
         results =
@@ -290,15 +299,30 @@ view model =
 
                         title =
                             "Search Results (" ++ commify numStudies ++ ")"
+
+                        resultsDiv =
+                            case numStudies of
+                                0 ->
+                                    []
+
+                                _ ->
+                                    [ h1 [] [ text title ]
+                                    , Button.button
+                                        [ Button.outlinePrimary
+                                        , Button.onClick Download
+                                        ]
+                                        [ text "Download" ]
+                                    , table
+                                        { options =
+                                            [ Bootstrap.Table.striped ]
+                                        , thead = thead [] []
+                                        , tbody =
+                                            tbody []
+                                                (List.map mkRow studies)
+                                        }
+                                    ]
                     in
-                    div []
-                        [ h1 [] [ text title ]
-                        , table
-                            { options = [ Bootstrap.Table.striped ]
-                            , thead = thead [] []
-                            , tbody = tbody [] (List.map mkRow studies)
-                            }
-                        ]
+                    div [] resultsDiv
     in
     Grid.container []
         [ Grid.row [ Row.centerMd ]
@@ -340,8 +364,8 @@ getConditionDropDown =
         }
 
 
-doSearch : Model -> Cmd Msg
-doSearch model =
+searchUrl : Model -> Bool -> String
+searchUrl model downloadCsv =
     let
         builder ( label, value ) =
             case value of
@@ -359,6 +383,14 @@ doSearch model =
                 _ ->
                     Just (String.join "::" model.selectedConditions)
 
+        downloadFlag =
+            case downloadCsv of
+                True ->
+                    Just "1"
+
+                _ ->
+                    Nothing
+
         queryParams =
             Url.Builder.toQuery <|
                 List.filterMap builder
@@ -368,28 +400,23 @@ doSearch model =
                     , ( "conditions"
                       , conditions
                       )
+                    , ( "download"
+                      , downloadFlag
+                      )
                     ]
-
-        url =
-            case String.length queryParams of
-                0 ->
-                    Nothing
-
-                _ ->
-                    Just <| apiServer ++ "/search/" ++ queryParams
     in
-    case url of
-        Just someUrl ->
-            Http.get
-                { url = someUrl
-                , expect =
-                    Http.expectJson
-                        (RemoteData.fromResult >> SearchResponse)
-                        (Json.Decode.list decoderStudy)
-                }
+    apiServer ++ "/search/" ++ queryParams
 
-        _ ->
-            Cmd.none
+
+doSearch : Model -> Cmd Msg
+doSearch model =
+    Http.get
+        { url = searchUrl model False
+        , expect =
+            Http.expectJson
+                (RemoteData.fromResult >> SearchResponse)
+                (Json.Decode.list decoderStudy)
+        }
 
 
 decoderConditionDropDown : Decoder ConditionDropDown
