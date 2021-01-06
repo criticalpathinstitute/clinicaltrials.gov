@@ -66,7 +66,9 @@ class Summary(BaseModel):
     num_studies: int
 
 
-dbh = psycopg2.connect('dbname=ct user=kyclark password="g0p3rl!"')
+dsn = 'dbname=ct user={} password={}'.format(config['DEFAULT']['dbuser'],
+                                             config['DEFAULT']['dbpass'])
+dbh = psycopg2.connect(dsn)
 
 
 # --------------------------------------------------
