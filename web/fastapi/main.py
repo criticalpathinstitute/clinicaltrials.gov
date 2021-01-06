@@ -3,12 +3,12 @@ FastAPI server for Clinical Trials
 """
 
 import csv
+import ct
 import io
 import os
 import psycopg2
 import psycopg2.extras
 from fastapi.responses import StreamingResponse
-from ct import Study, Condition, StudyToCondition
 from configparser import ConfigParser
 from fastapi import FastAPI
 from pymongo import MongoClient
@@ -160,8 +160,10 @@ def summary():
 def study(nct_id: str) -> StudyDetail:
     """ Study details """
 
-    if study := Study.query().where(Study.nct_id == nct_id):
-        return StudyDetail(nct_id=study.nct_id, title=study.official_title)
+    if studies := ct.Study.select().where(ct.Study.nct_id == nct_id):
+        study = studies[0]
+        return StudyDetail(nct_id=study.nct_id,
+                           title=study.official_title)
 
 
 # --------------------------------------------------
