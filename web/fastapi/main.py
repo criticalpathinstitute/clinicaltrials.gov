@@ -66,8 +66,9 @@ class Summary(BaseModel):
     num_studies: int
 
 
-dsn = 'dbname=ct user={} password={}'.format(config['DEFAULT']['dbuser'],
-                                             config['DEFAULT']['dbpass'])
+dsn_tmpl = 'dbname=ct user={} password={} host={}'
+dsn = dsn_tmpl.format(config['DEFAULT']['dbuser'], config['DEFAULT']['dbpass'],
+                      config['DEFAULT']['dbhost'])
 dbh = psycopg2.connect(dsn)
 
 
