@@ -25,6 +25,7 @@ parallel -j 8 --halt soon,fail=1 < "$JOBS"
 rm "$JOBS"
 
 echo "Creating index..."
+# echo "db.${COLL}.createIndex({text: 'text', detailed_description: 'text'})" > "$TMP"
 echo "db.${COLL}.createIndex({text: 'text'})" > "$TMP"
 mongo "$DB" --quiet < "$TMP"
 rm "$TMP"

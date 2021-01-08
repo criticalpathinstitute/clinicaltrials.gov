@@ -13,7 +13,7 @@ import Common exposing (commify, viewHttpErrorMessage)
 import Config exposing (apiServer)
 import Debug
 import File.Download as Download
-import Html exposing (Html, a, div, h1, text)
+import Html exposing (Html, a, br, div, h1, text)
 import Html.Attributes exposing (class, for, href, value)
 import Html.Events exposing (onInput, onSubmit)
 import Http
@@ -28,11 +28,12 @@ import Url.Builder
 
 type alias Model =
     { summary : WebData Summary
-    , query : Maybe String
-    , selectedConditions : List String
     , conditionFilter : Maybe String
     , conditionsDropDown : WebData (List ConditionDropDown)
     , searchResults : WebData (List Study)
+    , queryText : Maybe String
+    , querySelectedConditions : List String
+    , queryDetailedDescription : Maybe String
     }
 
 
@@ -51,6 +52,7 @@ type alias Summary =
 type alias Study =
     { nctId : String
     , title : String
+    , detailedDescription : String
     }
 
 
@@ -62,21 +64,25 @@ type Msg
     | RemoveCondition String
     | SummaryResponse (WebData Summary)
     | SetConditionFilter String
-    | SetQuery String
+    | SetQueryDetailedDescription String
+    | SetQueryText String
     | SearchResponse (WebData (List Study))
+
+
+initialModel =
+    { summary = RemoteData.NotAsked
+    , conditionFilter = Nothing
+    , conditionsDropDown = RemoteData.NotAsked
+    , searchResults = RemoteData.NotAsked
+    , queryText = Nothing
+    , querySelectedConditions = []
+    , queryDetailedDescription = Nothing
+    }
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( { summary = RemoteData.NotAsked
-      , query = Nothing
-      , selectedConditions = []
-      , conditionFilter = Nothing
-      , conditionsDropDown = RemoteData.NotAsked
-      , searchResults = RemoteData.NotAsked
-      }
-    , Cmd.batch [ getSummary, getConditionDropDown ]
-    )
+    ( initialModel, Cmd.batch [ getSummary, getConditionDropDown ] )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -94,8 +100,8 @@ update msg model =
 
                 newModel =
                     { model
-                        | selectedConditions =
-                            model.selectedConditions ++ newCondition
+                        | querySelectedConditions =
+                            model.querySelectedConditions ++ newCondition
                     }
             in
             ( newModel, doSearch newModel )
@@ -116,10 +122,10 @@ update msg model =
                 newConditions =
                     List.filter
                         (\c -> c /= condition)
-                        model.selectedConditions
+                        model.querySelectedConditions
 
                 newModel =
-                    { model | selectedConditions = newConditions }
+                    { model | querySelectedConditions = newConditions }
             in
             ( newModel, doSearch newModel )
 
@@ -147,7 +153,22 @@ update msg model =
             , Cmd.none
             )
 
-        SetQuery query ->
+        SetQueryDetailedDescription desc ->
+            let
+                newDesc =
+                    case String.length desc of
+                        0 ->
+                            Nothing
+
+                        _ ->
+                            Just desc
+
+                newModel =
+                    { model | queryDetailedDescription = newDesc }
+            in
+            ( newModel, doSearch newModel )
+
+        SetQueryText query ->
             let
                 newQuery =
                     case String.length query of
@@ -158,7 +179,7 @@ update msg model =
                             Just query
 
                 newModel =
-                    { model | query = newQuery }
+                    { model | queryText = newQuery }
             in
             ( newModel, doSearch newModel )
 
@@ -249,19 +270,25 @@ view model =
                 [ text (condition ++ " ⦻") ]
 
         viewSelectedConditions =
-            List.map viewCondition model.selectedConditions
+            List.map viewCondition model.querySelectedConditions
 
         searchForm =
             Form.form [ onSubmit DoSearch ]
                 [ Form.label [] [ text summary ]
                 , Form.group []
-                    [ Form.label [ for "text" ] [ text "Text" ]
+                    [ Form.label [ for "text" ] [ text "Text:" ]
                     , Input.text
-                        [ Input.attrs [ onInput SetQuery ] ]
+                        [ Input.attrs [ onInput SetQueryText ] ]
                     ]
+
+                --, Form.group []
+                --    [ Form.label [ for "text" ] [ text "Detailed Description:" ]
+                --    , Input.text
+                --        [ Input.attrs [ onInput SetQueryDetailedDescription ] ]
+                --    ]
                 , Form.group []
                     ([ Form.label [ for "condition" ]
-                        [ text "Condition" ]
+                        [ text "Condition:" ]
                      , Input.text
                         [ Input.attrs [ onInput SetConditionFilter ] ]
                      , mkConditionSelect
@@ -276,7 +303,7 @@ view model =
                     div [] [ text "" ]
 
                 RemoteData.Loading ->
-                    div [] [ text "Searching..." ]
+                    div [] [ text "Loading..." ]
 
                 RemoteData.Failure httpError ->
                     div [] [ text (viewHttpErrorMessage httpError) ]
@@ -291,6 +318,14 @@ view model =
                                             (Route.Study study.nctId)
                                         ]
                                         [ text study.title ]
+                                    , br [] []
+                                    , text study.nctId
+                                    , br [] []
+                                    , text
+                                        (truncate
+                                            study.detailedDescription
+                                            80
+                                        )
                                     ]
                                 ]
 
@@ -376,12 +411,12 @@ searchUrl model downloadCsv =
                     Nothing
 
         conditions =
-            case List.length model.selectedConditions of
+            case List.length model.querySelectedConditions of
                 0 ->
                     Nothing
 
                 _ ->
-                    Just (String.join "::" model.selectedConditions)
+                    Just (String.join "::" model.querySelectedConditions)
 
         downloadFlag =
             case downloadCsv of
@@ -395,8 +430,12 @@ searchUrl model downloadCsv =
             Url.Builder.toQuery <|
                 List.filterMap builder
                     [ ( "text"
-                      , model.query
+                      , model.queryText
                       )
+
+                    --, ( "detailed_description"
+                    --  , model.queryDetailedDescription
+                    --  )
                     , ( "conditions"
                       , conditions
                       )
@@ -419,6 +458,16 @@ doSearch model =
         }
 
 
+truncate : String -> Int -> String
+truncate text max =
+    case String.length text <= (max - 3) of
+        True ->
+            text
+
+        _ ->
+            String.left (max - 3) text ++ "..."
+
+
 decoderConditionDropDown : Decoder ConditionDropDown
 decoderConditionDropDown =
     Json.Decode.succeed ConditionDropDown
@@ -438,6 +487,7 @@ decoderStudy =
     Json.Decode.succeed Study
         |> Json.Decode.Pipeline.required "nct_id" string
         |> Json.Decode.Pipeline.required "title" string
+        |> Json.Decode.Pipeline.optional "detailed_description" string ""
 
 
 subscriptions : Model -> Sub Msg

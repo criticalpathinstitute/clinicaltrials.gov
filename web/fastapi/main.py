@@ -55,11 +55,13 @@ class ConditionDropDown(BaseModel):
 class StudySearchResult(BaseModel):
     nct_id: str
     title: str
+    detailed_description: str
 
 
 class StudyDetail(BaseModel):
     nct_id: str
     title: str
+    detailed_description: str
 
 
 class Summary(BaseModel):
@@ -83,13 +85,16 @@ def get_cur():
 @app.get('/search', response_model=List[StudySearchResult])
 def search(text: Optional[str] = '',
            conditions: Optional[str] = '',
+           detailed_desc: Optional[str] = '',
            download: int = 0):
     """ Search """
     def f(rec):
-        return StudySearchResult(nct_id=rec['nct_id'],
-                                 title=rec['official_title'])
+        return StudySearchResult(
+            nct_id=rec['nct_id'],
+            title=rec['official_title'],
+            detailed_description=rec['detailed_description'])
 
-    flds = ['nct_id', 'official_title']
+    flds = ['nct_id', 'official_title', 'detailed_description']
     proj = {fld: 1 for fld in flds}
     qry = {}
 
@@ -163,7 +168,8 @@ def study(nct_id: str) -> StudyDetail:
     if studies := ct.Study.select().where(ct.Study.nct_id == nct_id):
         study = studies[0]
         return StudyDetail(nct_id=study.nct_id,
-                           title=study.official_title)
+                           title=study.official_title,
+                           detailed_description=study.detailed_description)
 
 
 # --------------------------------------------------

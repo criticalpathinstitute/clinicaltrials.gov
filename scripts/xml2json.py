@@ -236,7 +236,8 @@ def get_args() -> Args:
                         '--dir',
                         help='Directory of XML file',
                         metavar='DIR',
-                        type=str)
+                        type=str,
+                        nargs='+')
 
     parser.add_argument('-o',
                         '--outdir',
@@ -257,10 +258,13 @@ def get_args() -> Args:
         os.makedirs(args.outdir)
 
     if args.dir and not args.file:
-        if not os.path.isdir(args.dir):
-            args.dir = os.path.abspath(args.dir)
+        filenames = []
+        for dirname in args.dir:
+            if not os.path.isdir(dirname):
+                dirname = os.path.abspath(dirname)
+            filenames.extend(list(Path(dirname).rglob('*.xml')))
 
-        args.file = list(Path(args.dir).rglob('*.xml'))
+        args.file = filenames
 
     if not args.file:
         parser.error('Must indicate either input --file or --dir')

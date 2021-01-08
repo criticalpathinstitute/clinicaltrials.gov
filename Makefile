@@ -7,9 +7,9 @@ reqs:
 orm:
 	pwiz.py ct > scripts/ct.py
 
-dumps:
-	pg_dump $(DB) > $(DB).sql
-	mongoexport --out ct_mongo.json --db $(DB) --collection ct
+dump:
+	pg_dump $(DB) > dumps/$(DB).sql
+	mongoexport --out dumps/ct_mongo.json --db $(DB) --collection ct
 
 # 1. Download all the data
 data:
@@ -20,7 +20,7 @@ one:
 	./scripts/xml2json.py -s $(SCHEMA) -f xml/NCT0145xxxx/NCT01452867.xml -o json
 
 some:
-	./scripts/xml2json.py -s $(SCHEMA) -d xml/NCT0145xxxx -o json
+	./scripts/xml2json.py -s $(SCHEMA) -d xml/NCT014* -o json
 
 json:
 	#./scripts/xml2json.py -d xml -o json
@@ -28,3 +28,6 @@ json:
 # 3. Import JSON into Mongo
 mongo:
 	./scripts/mongoimport.sh
+
+pgload:
+	./scripts/load_pg.py json/*
