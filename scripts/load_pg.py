@@ -54,7 +54,8 @@ def main() -> None:
             detailed_description=data['detailed_description'],
             disposition_first_posted=data['disposition_first_posted'],
             disposition_first_submitted=data['disposition_first_submitted'],
-            disposition_first_submitted_qc=data['disposition_first_submitted_qc'],
+            disposition_first_submitted_qc=data[
+                'disposition_first_submitted_qc'],
             has_expanded_access=data['has_expanded_access'],
             last_known_status=data['last_known_status'],
             last_update_posted=data['last_update_posted'],
@@ -84,7 +85,8 @@ def main() -> None:
 
         for condition in data.get('conditions'):
             cond, _ = Condition.get_or_create(condition=condition)
-            s2c, _ = StudyToCondition.get_or_create(study_id=study.study_id, condition_id=cond.condition_id)
+            s2c, _ = StudyToCondition.get_or_create(
+                study_id=study.study_id, condition_id=cond.condition_id)
 
     print('Done.')
 

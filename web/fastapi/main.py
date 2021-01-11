@@ -8,6 +8,7 @@ import io
 import os
 import psycopg2
 import psycopg2.extras
+import re
 from fastapi.responses import StreamingResponse
 from configparser import ConfigParser
 from fastapi import FastAPI
@@ -53,6 +54,7 @@ class ConditionDropDown(BaseModel):
 
 
 class StudySearchResult(BaseModel):
+    study_id: int
     nct_id: str
     title: str
     detailed_description: str
@@ -90,21 +92,47 @@ def search(text: Optional[str] = '',
     """ Search """
     def f(rec):
         return StudySearchResult(
+            study_id=rec['study_id'],
             nct_id=rec['nct_id'],
             title=rec['official_title'],
             detailed_description=rec['detailed_description'])
 
-    flds = ['nct_id', 'official_title', 'detailed_description']
-    proj = {fld: 1 for fld in flds}
-    qry = {}
+    flds = ['study_id', 'nct_id', 'official_title', 'detailed_description']
+    # proj = {fld: 1 for fld in flds}
+    # qry = {}
+
+
+    where = []
+    if conditions:
+        # qry['conditions'] = {'$in': conditions.split('::')}
+        where.append('and c.condition_id in ({})'.format(conditions))
 
     if text:
-        qry['$text'] = {'$search': text}
+        # qry['$text'] = {'$search': text}
+        where.append('and s.text @@ to_tsquery({})'.format(make_bool(text)))
 
-    if conditions:
-        qry['conditions'] = {'$in': conditions.split('::')}
+    if detailed_desc:
+        where.append(' and s.detailed_description @@ to_tsquery({})'.format(
+            make_bool(detailed_desc)))
 
-    res = mongo_db['ct'].find(qry, proj) if qry else []
+    # res = mongo_db['ct'].find(qry, proj) if qry else []
+
+    if not where:
+        return []
+
+    sql = """
+        select s.study_id, s.nct_id,
+               s.official_title, s.detailed_description
+        from   study s, study_to_condition s2c, condition c
+        where  s.study_id=s2c.study_id
+        and    s2c.condition_id=c.condition_id
+        {}
+    """.format('\n'.join(where))
+    print(sql)
+    cur = get_cur()
+    cur.execute(sql)
+    res = cur.fetchall()
+    cur.close()
 
     if not res:
         return []
@@ -123,6 +151,15 @@ def search(text: Optional[str] = '',
         return response
     else:
         return list(map(f, res))
+        # return list(map(lambda r: StudySearchResult(**dict(r)), res))
+
+
+# --------------------------------------------------
+def make_bool(s: str):
+    """ Turn and or to & | """
+
+    return "'{}'".format(
+        re.sub('\s+or\s+', ' | ', re.sub('\s+and\s+', ' & ', s, re.I), re.I))
 
 
 # --------------------------------------------------

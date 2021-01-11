@@ -24,6 +24,7 @@ type alias Model =
 type alias Study =
     { nctId : String
     , title : String
+    , detailedDescription : String
     }
 
 
@@ -65,6 +66,7 @@ view model =
                 RemoteData.Success study ->
                     div []
                         [ h1 [] [ text <| "Study: " ++ study.title ]
+                        , text study.detailedDescription
                         ]
     in
     Grid.container []
@@ -98,6 +100,7 @@ decoderStudy =
     Json.Decode.succeed Study
         |> Json.Decode.Pipeline.required "nct_id" string
         |> Json.Decode.Pipeline.required "title" string
+        |> Json.Decode.Pipeline.required "detailed_description" string
 
 
 subscriptions : Model -> Sub Msg

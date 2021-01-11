@@ -29,23 +29,23 @@ import Url.Builder
 type alias Model =
     { summary : WebData Summary
     , conditionFilter : Maybe String
-    , conditionsDropDown : WebData (List ConditionDropDown)
+    , conditions : WebData (List Condition)
     , searchResults : WebData (List Study)
     , queryText : Maybe String
-    , querySelectedConditions : List String
+    , querySelectedConditions : List Condition
     , queryDetailedDescription : Maybe String
     }
 
 
-type alias ConditionDropDown =
+type alias Condition =
     { conditionId : Int
     , condition : String
-    , num_studies : Int
+    , numStudies : Int
     }
 
 
 type alias Summary =
-    { num_studies : Int
+    { numStudies : Int
     }
 
 
@@ -58,10 +58,10 @@ type alias Study =
 
 type Msg
     = AddCondition String
-    | ConditionDropDownResponse (WebData (List ConditionDropDown))
+    | ConditionsResponse (WebData (List Condition))
     | DoSearch
     | Download
-    | RemoveCondition String
+    | RemoveCondition Condition
     | SummaryResponse (WebData Summary)
     | SetConditionFilter String
     | SetQueryDetailedDescription String
@@ -72,7 +72,7 @@ type Msg
 initialModel =
     { summary = RemoteData.NotAsked
     , conditionFilter = Nothing
-    , conditionsDropDown = RemoteData.NotAsked
+    , conditions = RemoteData.NotAsked
     , searchResults = RemoteData.NotAsked
     , queryText = Nothing
     , querySelectedConditions = []
@@ -82,32 +82,45 @@ initialModel =
 
 init : ( Model, Cmd Msg )
 init =
-    ( initialModel, Cmd.batch [ getSummary, getConditionDropDown ] )
+    ( initialModel, Cmd.batch [ getSummary, getConditions ] )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        AddCondition condition ->
+        AddCondition conditionId ->
             let
-                newCondition =
-                    case String.length condition of
-                        0 ->
-                            []
+                possibleConditions =
+                    case String.toInt conditionId of
+                        Just newId ->
+                            case model.conditions of
+                                RemoteData.Success data ->
+                                    Just <|
+                                        List.filter
+                                            (\c -> c.conditionId == newId)
+                                            data
+
+                                _ ->
+                                    Nothing
 
                         _ ->
-                            [ condition ]
+                            Nothing
+
+                newConditions =
+                    case possibleConditions of
+                        Just someConditions ->
+                            model.querySelectedConditions ++ someConditions
+
+                        _ ->
+                            model.querySelectedConditions
 
                 newModel =
-                    { model
-                        | querySelectedConditions =
-                            model.querySelectedConditions ++ newCondition
-                    }
+                    { model | querySelectedConditions = newConditions }
             in
             ( newModel, doSearch newModel )
 
-        ConditionDropDownResponse data ->
-            ( { model | conditionsDropDown = data }
+        ConditionsResponse data ->
+            ( { model | conditions = data }
             , Cmd.none
             )
 
@@ -121,7 +134,7 @@ update msg model =
             let
                 newConditions =
                     List.filter
-                        (\c -> c /= condition)
+                        (\c -> c.conditionId /= condition.conditionId)
                         model.querySelectedConditions
 
                 newModel =
@@ -199,21 +212,12 @@ view model =
                     viewHttpErrorMessage httpError
 
                 RemoteData.Success data ->
-                    "Search " ++ commify data.num_studies ++ " studies"
+                    "Search " ++ commify data.numStudies ++ " studies"
 
         mkConditionSelect =
             let
                 empty =
                     [ Select.item [ value "" ] [ text "--Select--" ] ]
-
-                mkSelectItem condition =
-                    Select.item [ value condition.condition ]
-                        [ text <|
-                            condition.condition
-                                ++ " ("
-                                ++ String.fromInt condition.num_studies
-                                ++ ")"
-                        ]
 
                 filterConditions conditions =
                     let
@@ -251,8 +255,17 @@ view model =
                                 , Select.onChange AddCondition
                                 ]
                                 (empty ++ List.map mkSelectItem data)
+
+                mkSelectItem condition =
+                    Select.item [ value <| String.fromInt condition.conditionId ]
+                        [ text <|
+                            condition.condition
+                                ++ " ("
+                                ++ String.fromInt condition.numStudies
+                                ++ ")"
+                        ]
             in
-            case model.conditionsDropDown of
+            case model.conditions of
                 RemoteData.Success data ->
                     mkSelect (filterConditions data)
 
@@ -267,7 +280,7 @@ view model =
                 [ Button.outlinePrimary
                 , Button.onClick (RemoveCondition condition)
                 ]
-                [ text (condition ++ " ⦻") ]
+                [ text (condition.condition ++ " ⦻") ]
 
         viewSelectedConditions =
             List.map viewCondition model.querySelectedConditions
@@ -280,12 +293,11 @@ view model =
                     , Input.text
                         [ Input.attrs [ onInput SetQueryText ] ]
                     ]
-
-                --, Form.group []
-                --    [ Form.label [ for "text" ] [ text "Detailed Description:" ]
-                --    , Input.text
-                --        [ Input.attrs [ onInput SetQueryDetailedDescription ] ]
-                --    ]
+                , Form.group []
+                    [ Form.label [ for "text" ] [ text "Detailed Description:" ]
+                    , Input.text
+                        [ Input.attrs [ onInput SetQueryDetailedDescription ] ]
+                    ]
                 , Form.group []
                     ([ Form.label [ for "condition" ]
                         [ text "Condition:" ]
@@ -384,8 +396,8 @@ getSummary =
         }
 
 
-getConditionDropDown : Cmd Msg
-getConditionDropDown =
+getConditions : Cmd Msg
+getConditions =
     let
         url =
             apiServer ++ "/conditions"
@@ -394,8 +406,8 @@ getConditionDropDown =
         { url = url
         , expect =
             Http.expectJson
-                (RemoteData.fromResult >> ConditionDropDownResponse)
-                (Json.Decode.list decoderConditionDropDown)
+                (RemoteData.fromResult >> ConditionsResponse)
+                (Json.Decode.list decoderCondition)
         }
 
 
@@ -416,7 +428,12 @@ searchUrl model downloadCsv =
                     Nothing
 
                 _ ->
-                    Just (String.join "::" model.querySelectedConditions)
+                    Just
+                        (String.join ","
+                            (List.map (\c -> String.fromInt c.conditionId)
+                                model.querySelectedConditions
+                            )
+                        )
 
         downloadFlag =
             case downloadCsv of
@@ -432,10 +449,9 @@ searchUrl model downloadCsv =
                     [ ( "text"
                       , model.queryText
                       )
-
-                    --, ( "detailed_description"
-                    --  , model.queryDetailedDescription
-                    --  )
+                    , ( "detailed_desc"
+                      , model.queryDetailedDescription
+                      )
                     , ( "conditions"
                       , conditions
                       )
@@ -468,9 +484,9 @@ truncate text max =
             String.left (max - 3) text ++ "..."
 
 
-decoderConditionDropDown : Decoder ConditionDropDown
-decoderConditionDropDown =
-    Json.Decode.succeed ConditionDropDown
+decoderCondition : Decoder Condition
+decoderCondition =
+    Json.Decode.succeed Condition
         |> Json.Decode.Pipeline.required "condition_id" int
         |> Json.Decode.Pipeline.required "condition" string
         |> Json.Decode.Pipeline.required "num_studies" int
