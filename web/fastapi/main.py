@@ -101,7 +101,6 @@ def search(text: Optional[str] = '',
     # proj = {fld: 1 for fld in flds}
     # qry = {}
 
-
     where = []
     if conditions:
         # qry['conditions'] = {'$in': conditions.split('::')}
@@ -129,10 +128,15 @@ def search(text: Optional[str] = '',
         {}
     """.format('\n'.join(where))
     print(sql)
-    cur = get_cur()
-    cur.execute(sql)
-    res = cur.fetchall()
-    cur.close()
+
+    res = []
+    try:
+        cur = get_cur()
+        cur.execute(sql)
+        res = cur.fetchall()
+        cur.close()
+    except:
+        dbh.rollback()
 
     if not res:
         return []
@@ -158,8 +162,10 @@ def search(text: Optional[str] = '',
 def make_bool(s: str):
     """ Turn and or to & | """
 
-    return "'{}'".format(
-        re.sub('\s+or\s+', ' | ', re.sub('\s+and\s+', ' & ', s, re.I), re.I))
+    s = re.sub('[*]', '', s)
+    s = re.sub('\s+and\s+', ' & ', s, re.I)
+    s = re.sub('\s+or\s+', ' | ', s, re.I)
+    return f"'{s}'"
 
 
 # --------------------------------------------------

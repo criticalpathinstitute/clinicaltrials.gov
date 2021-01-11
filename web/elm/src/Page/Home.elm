@@ -175,11 +175,8 @@ update msg model =
 
                         _ ->
                             Just desc
-
-                newModel =
-                    { model | queryDetailedDescription = newDesc }
             in
-            ( newModel, doSearch newModel )
+            ( { model | queryDetailedDescription = newDesc }, Cmd.none )
 
         SetQueryText query ->
             let
@@ -190,11 +187,8 @@ update msg model =
 
                         _ ->
                             Just query
-
-                newModel =
-                    { model | queryText = newQuery }
             in
-            ( newModel, doSearch newModel )
+            ( { model | queryText = newQuery }, Cmd.none )
 
 
 view : Model -> Html Msg
@@ -307,6 +301,9 @@ view model =
                      ]
                         ++ viewSelectedConditions
                     )
+                , Button.button
+                    [ Button.primary, Button.onClick DoSearch ]
+                    [ text "Submit" ]
                 ]
 
         results =
@@ -348,26 +345,29 @@ view model =
                             "Search Results (" ++ commify numStudies ++ ")"
 
                         resultsDiv =
-                            case numStudies of
-                                0 ->
-                                    []
+                            let
+                                body =
+                                    case numStudies of
+                                        0 ->
+                                            []
 
-                                _ ->
-                                    [ h1 [] [ text title ]
-                                    , Button.button
-                                        [ Button.outlinePrimary
-                                        , Button.onClick Download
-                                        ]
-                                        [ text "Download" ]
-                                    , table
-                                        { options =
-                                            [ Bootstrap.Table.striped ]
-                                        , thead = thead [] []
-                                        , tbody =
-                                            tbody []
-                                                (List.map mkRow studies)
-                                        }
-                                    ]
+                                        _ ->
+                                            [ Button.button
+                                                [ Button.outlinePrimary
+                                                , Button.onClick Download
+                                                ]
+                                                [ text "Download" ]
+                                            , table
+                                                { options =
+                                                    [ Bootstrap.Table.striped ]
+                                                , thead = thead [] []
+                                                , tbody =
+                                                    tbody []
+                                                        (List.map mkRow studies)
+                                                }
+                                            ]
+                            in
+                            [ h1 [] [ text title ] ] ++ body
                     in
                     div [] resultsDiv
     in
