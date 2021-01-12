@@ -145,7 +145,7 @@ def search(text: Optional[str] = '',
             'table':
             'study_to_sponsor s2p',
             'where': [
-                'and s.study_id=s2p.study_id',
+                's.study_id=s2p.study_id',
                 's2p.sponsor_id in ({})'.format(sponsors)
             ]
         })
@@ -165,7 +165,7 @@ def search(text: Optional[str] = '',
         where  s.study_id is not null
         and {}
     """.format(table_names, where)
-    # print(sql)
+    print(sql)
 
     res = []
     try:

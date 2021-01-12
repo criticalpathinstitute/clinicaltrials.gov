@@ -14,7 +14,7 @@ import Config exposing (apiServer)
 import Debug
 import File.Download as Download
 import Html exposing (Html, a, br, div, h1, text)
-import Html.Attributes exposing (class, for, href, value)
+import Html.Attributes exposing (class, for, href, target, value)
 import Html.Events exposing (onInput, onSubmit)
 import Http
 import Json.Decode exposing (Decoder, field, float, int, nullable, string)
@@ -504,6 +504,7 @@ view model =
                                     [ a
                                         [ Route.href
                                             (Route.Study study.nctId)
+                                        , target "_blank"
                                         ]
                                         [ text study.title ]
                                     , br [] []

@@ -34,8 +34,8 @@ type alias Model =
 
 
 type Page
-    = Home Page.Home.Model
-    | Study String Page.Study.Model
+    = HomePage Page.Home.Model
+    | StudyPage String Page.Study.Model
 
 
 type Msg
@@ -52,16 +52,23 @@ init _ url key =
         ( navbarState, navbarCmd ) =
             Navbar.initialState NavbarMsg
 
-        ( subModel, subMsg ) =
+        ( homeModel, homeMsg ) =
             Page.Home.init
+
+        initialModel =
+            { key = key
+            , url = url
+            , curPage = HomePage homeModel
+            , navbarState = navbarState
+            }
+
+        currentRoute =
+            Route.fromUrl url
+
+        ( newModel, subMsg ) =
+            changeRouteTo currentRoute initialModel
     in
-    ( { key = key
-      , url = url
-      , curPage = Home subModel
-      , navbarState = navbarState
-      }
-    , Cmd.batch [ navbarCmd, Cmd.map HomeMsg subMsg ]
-    )
+    ( newModel, Cmd.batch [ navbarCmd, subMsg ] )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -83,21 +90,21 @@ update msg model =
         ( NavbarMsg state, _ ) ->
             ( { model | navbarState = state }, Cmd.none )
 
-        ( HomeMsg subMsg, Home subModel ) ->
+        ( HomeMsg subMsg, HomePage subModel ) ->
             let
                 ( newSubModel, newCmd ) =
                     Page.Home.update subMsg subModel
             in
-            ( { model | curPage = Home newSubModel }
+            ( { model | curPage = HomePage newSubModel }
             , Cmd.map HomeMsg newCmd
             )
 
-        ( StudyMsg subMsg, Study nctId subModel ) ->
+        ( StudyMsg subMsg, StudyPage nctId subModel ) ->
             let
                 ( newSubModel, newCmd ) =
                     Page.Study.update subMsg subModel
             in
-            ( { model | curPage = Study nctId newSubModel }
+            ( { model | curPage = StudyPage nctId newSubModel }
             , Cmd.map StudyMsg newCmd
             )
 
@@ -112,23 +119,23 @@ view model =
             Navbar.config NavbarMsg
     in
     case model.curPage of
-        Home subModel ->
-            PageView.view navConfig
-                model.navbarState
-                (Html.map HomeMsg (Page.Home.view subModel))
-
-        Study nctId subModel ->
+        StudyPage nctId subModel ->
             PageView.view navConfig
                 model.navbarState
                 (Html.map StudyMsg
                     (Page.Study.view subModel)
                 )
 
+        HomePage subModel ->
+            PageView.view navConfig
+                model.navbarState
+                (Html.map HomeMsg (Page.Home.view subModel))
+
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
     case model.curPage of
-        Home subModel ->
+        HomePage subModel ->
             Sub.map HomeMsg
                 (Page.Home.subscriptions subModel)
 
@@ -138,20 +145,13 @@ subscriptions model =
 
 changeRouteTo : Maybe Route -> Model -> ( Model, Cmd Msg )
 changeRouteTo maybeRoute model =
-    let
-        _ =
-            Debug.log "maybeRoute" maybeRoute
-
-        _ =
-            Debug.log "model" model
-    in
     case maybeRoute of
         Just (Route.Study nctId) ->
             let
                 ( subModel, subMsg ) =
                     Page.Study.init nctId
             in
-            ( { model | curPage = Study nctId subModel }
+            ( { model | curPage = StudyPage nctId subModel }
             , Cmd.map StudyMsg subMsg
             )
 
@@ -160,4 +160,4 @@ changeRouteTo maybeRoute model =
                 ( subModel, subMsg ) =
                     Page.Home.init
             in
-            ( { model | curPage = Home subModel }, Cmd.map HomeMsg subMsg )
+            ( { model | curPage = HomePage subModel }, Cmd.map HomeMsg subMsg )
