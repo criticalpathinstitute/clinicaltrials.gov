@@ -187,6 +187,7 @@ class Study(TypedDict):
     text: str
     conditions: List[str]
     keywords: List[str]
+    sponsors: List[str]
     eligibility: Optional[Eligibility]
     number_of_arms: Optional[int]
     number_of_groups: Optional[int]
@@ -212,9 +213,7 @@ class Study(TypedDict):
 
 # class Sponsor(TypedDict):
 #     """ Sponsor """
-#     sponsor_type: str
-#     agency: str
-#     agency_class: str
+#     sponsor: str
 
 
 # --------------------------------------------------
@@ -250,7 +249,8 @@ def get_args() -> Args:
                         '--schema',
                         help='XML Schema',
                         metavar='FILE',
-                        type=argparse.FileType('rt'))
+                        type=argparse.FileType('rt'),
+                        required=True)
 
     args = parser.parse_args()
 
@@ -594,6 +594,24 @@ def get_study_docs(xml, fld) -> List[StudyDoc]:
 
 
 # --------------------------------------------------
+def get_sponsors(xml, fld) -> List[str]:
+    """ Get sponsors """
+
+    sponsors = []
+    if data := xml.get(fld):
+        if lead := data.get('lead_sponsor'):
+            # sponsors.append(Sponsor(sponsor=lead.get('agency')))
+            sponsors.append(lead.get('agency'))
+
+        if collabs := data.get('collaborator'):
+            for collab in collabs:
+                # sponsors.append(Sponsor(sponsor=collab.get('agency')))
+                sponsors.append(collab.get('agency'))
+
+    return sponsors
+
+
+# --------------------------------------------------
 def get_provided_documents(xml, fld) -> List[ProvidedDocument]:
     """ Get provided_documents """
 
@@ -693,6 +711,7 @@ def restructure(xml: str, all_text: str) -> Study:
         enrollment=get_enrollment(xml),
         oversight_info=get_oversight(xml),
         study_design=get_study_design(xml),
+        sponsors=get_sponsors(xml, 'sponsors'),
         primary_outcomes=get_protocols(xml, 'primary_outcome'),
         secondary_outcomes=get_protocols(xml, 'secondary_outcome'),
         other_outcomes=get_protocols(xml, 'other_outcome'),

@@ -11,6 +11,7 @@ import psycopg2.extras
 import re
 from fastapi.responses import StreamingResponse
 from configparser import ConfigParser
+from itertools import chain
 from fastapi import FastAPI
 from pymongo import MongoClient
 from starlette.middleware.cors import CORSMiddleware
@@ -66,6 +67,12 @@ class StudyDetail(BaseModel):
     detailed_description: str
 
 
+class Sponsor(BaseModel):
+    sponsor_id: int
+    sponsor: str
+    num_studies: int
+
+
 class Summary(BaseModel):
     num_studies: int
 
@@ -87,6 +94,7 @@ def get_cur():
 @app.get('/search', response_model=List[StudySearchResult])
 def search(text: Optional[str] = '',
            conditions: Optional[str] = '',
+           sponsors: Optional[str] = '',
            detailed_desc: Optional[str] = '',
            download: int = 0):
     """ Search """
@@ -102,32 +110,62 @@ def search(text: Optional[str] = '',
     # qry = {}
 
     where = []
-    if conditions:
-        # qry['conditions'] = {'$in': conditions.split('::')}
-        where.append('and c.condition_id in ({})'.format(conditions))
 
     if text:
         # qry['$text'] = {'$search': text}
-        where.append('and s.text @@ to_tsquery({})'.format(make_bool(text)))
+        where.append({
+            'table':
+            '',
+            'where': ['s.text @@ to_tsquery({})'.format(make_bool(text))]
+        })
 
     if detailed_desc:
-        where.append(' and s.detailed_description @@ to_tsquery({})'.format(
-            make_bool(detailed_desc)))
+        where.append({
+            'table':
+            '',
+            'where': [
+                's.detailed_description @@ to_tsquery({})'.format(
+                    make_bool(detailed_desc))
+            ]
+        })
+
+    if conditions:
+        # qry['conditions'] = {'$in': conditions.split('::')}
+        where.append({
+            'table':
+            'study_to_condition s2c',
+            'where': [
+                's.study_id=s2c.study_id',
+                's2c.condition_id in ({})'.format(conditions)
+            ]
+        })
+
+    if sponsors:
+        where.append({
+            'table':
+            'study_to_sponsor s2p',
+            'where': [
+                'and s.study_id=s2p.study_id',
+                's2p.sponsor_id in ({})'.format(sponsors)
+            ]
+        })
 
     # res = mongo_db['ct'].find(qry, proj) if qry else []
 
     if not where:
         return []
 
+    table_names = ', '.join(
+        filter(None, ['study s'] + list(map(lambda x: x['table'], where))))
+    where = '\nand '.join(chain.from_iterable(map(lambda x: x['where'],
+                                                  where)))
     sql = """
-        select s.study_id, s.nct_id,
-               s.official_title, s.detailed_description
-        from   study s, study_to_condition s2c, condition c
-        where  s.study_id=s2c.study_id
-        and    s2c.condition_id=c.condition_id
-        {}
-    """.format('\n'.join(where))
-    print(sql)
+        select s.study_id, s.nct_id, s.official_title, s.detailed_description
+        from   {}
+        where  s.study_id is not null
+        and {}
+    """.format(table_names, where)
+    # print(sql)
 
     res = []
     try:
@@ -235,6 +273,29 @@ def conditions(name: Optional[str] = '') -> List[ConditionDropDown]:
     cur.execute(sql)
     res = cur.fetchall()
     conditions = list(map(lambda r: ConditionDropDown(**dict(r)), res))
+    cur.close()
+
+    return conditions
+
+
+# --------------------------------------------------
+@app.get('/sponsors', response_model=List[Sponsor])
+def sponsors() -> List[Sponsor]:
+    """ Sponsors/Num Studies """
+
+    sql = """
+        select   p.sponsor_id, p.sponsor, count(s.study_id) as num_studies
+        from     sponsor p, study_to_sponsor s2p, study s
+        where    p.sponsor_id=s2p.sponsor_id
+        and      s2p.study_id=s.study_id
+        group by 1, 2
+        order by 2
+    """
+
+    cur = get_cur()
+    cur.execute(sql)
+    res = cur.fetchall()
+    conditions = list(map(lambda r: Sponsor(**dict(r)), res))
     cur.close()
 
     return conditions

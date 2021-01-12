@@ -13,31 +13,32 @@ create table study (
     overall_status text,
     last_known_status text,
     why_stopped text,
-    start_date text,
-    completion_date text,
-    verification_date text,
-    study_first_submitted text,
-    study_first_submitted_qc text,
-    study_first_posted text,
-    results_first_submitted text,
-    results_first_submitted_qc text,
-    results_first_posted text,
-    disposition_first_submitted text,
-    disposition_first_submitted_qc text,
-    disposition_first_posted text,
-    last_update_submitted text,
-    last_update_submitted_qc text,
-    last_update_posted text,
-    primary_completion_date text,
     phase text,
     study_type text,
     has_expanded_access text,
     target_duration text,
     biospec_retention text,
     biospec_description text,
+    start_date date,
+    completion_date date,
+    verification_date date,
+    study_first_submitted date,
+    study_first_submitted_qc date,
+    study_first_posted date,
+    results_first_submitted date,
+    results_first_submitted_qc date,
+    results_first_posted date,
+    disposition_first_submitted date,
+    disposition_first_submitted_qc date,
+    disposition_first_posted date,
+    last_update_submitted date,
+    last_update_submitted_qc date,
+    last_update_posted date,
+    primary_completion_date date,
     text text
 );
 
+CREATE INDEX study_detailed_desc ON study USING GIN (to_tsvector('english', detailed_description));
 CREATE INDEX study_text ON study USING GIN (to_tsvector('english', text));
 
 drop table if exists condition;
@@ -53,4 +54,49 @@ create table study_to_condition (
     condition_id INT NOT NULL,
     foreign key (study_id) references study (study_id) on delete cascade,
     foreign key (condition_id) references condition (condition_id) on delete cascade
+);
+
+drop table if exists keyword;
+create table keyword (
+    keyword_id SERIAL PRIMARY KEY,
+    keyword varchar(255)
+);
+
+drop table if exists study_to_keyword;
+create table study_to_keyword (
+    study_to_keyword_id SERIAL PRIMARY KEY,
+    study_id INT NOT NULL,
+    keyword_id INT NOT NULL,
+    foreign key (study_id) references study (study_id) on delete cascade,
+    foreign key (keyword_id) references keyword (keyword_id) on delete cascade
+);
+
+drop table if exists intervention;
+create table intervention (
+    intervention_id SERIAL PRIMARY KEY,
+    intervention varchar(255)
+);
+
+drop table if exists study_to_intervention;
+create table study_to_intervention (
+    study_to_intervention_id SERIAL PRIMARY KEY,
+    study_id INT NOT NULL,
+    intervention_id INT NOT NULL,
+    foreign key (study_id) references study (study_id) on delete cascade,
+    foreign key (intervention_id) references intervention (intervention_id) on delete cascade
+);
+
+drop table if exists sponsor;
+create table sponsor (
+    sponsor_id SERIAL PRIMARY KEY,
+    sponsor varchar(255)
+);
+
+drop table if exists study_to_sponsor;
+create table study_to_sponsor (
+    study_to_sponsor_id SERIAL PRIMARY KEY,
+    study_id INT NOT NULL,
+    sponsor_id INT NOT NULL,
+    foreign key (study_id) references study (study_id) on delete cascade,
+    foreign key (sponsor_id) references sponsor (sponsor_id) on delete cascade
 );

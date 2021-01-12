@@ -31,8 +31,11 @@ type alias Model =
     , conditionFilter : Maybe String
     , conditions : WebData (List Condition)
     , searchResults : WebData (List Study)
+    , sponsors : WebData (List Sponsor)
+    , sponsorFilter : Maybe String
     , queryText : Maybe String
     , querySelectedConditions : List Condition
+    , querySelectedSponsors : List Sponsor
     , queryDetailedDescription : Maybe String
     }
 
@@ -40,6 +43,13 @@ type alias Model =
 type alias Condition =
     { conditionId : Int
     , condition : String
+    , numStudies : Int
+    }
+
+
+type alias Sponsor =
+    { sponsorId : Int
+    , sponsorName : String
     , numStudies : Int
     }
 
@@ -58,15 +68,20 @@ type alias Study =
 
 type Msg
     = AddCondition String
+    | AddSponsor String
     | ConditionsResponse (WebData (List Condition))
     | DoSearch
     | Download
     | RemoveCondition Condition
+    | RemoveSponsor Sponsor
+    | Reset
     | SummaryResponse (WebData Summary)
     | SetConditionFilter String
+    | SetSponsorFilter String
     | SetQueryDetailedDescription String
     | SetQueryText String
     | SearchResponse (WebData (List Study))
+    | SponsorsResponse (WebData (List Sponsor))
 
 
 initialModel =
@@ -74,15 +89,18 @@ initialModel =
     , conditionFilter = Nothing
     , conditions = RemoteData.NotAsked
     , searchResults = RemoteData.NotAsked
+    , sponsors = RemoteData.NotAsked
+    , sponsorFilter = Nothing
     , queryText = Nothing
     , querySelectedConditions = []
+    , querySelectedSponsors = []
     , queryDetailedDescription = Nothing
     }
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( initialModel, Cmd.batch [ getSummary, getConditions ] )
+    ( initialModel, Cmd.batch [ getSummary, getConditions, getSponsors ] )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -119,6 +137,37 @@ update msg model =
             in
             ( newModel, doSearch newModel )
 
+        AddSponsor sponsorId ->
+            let
+                possibleSponsors =
+                    case String.toInt sponsorId of
+                        Just newId ->
+                            case model.sponsors of
+                                RemoteData.Success data ->
+                                    Just <|
+                                        List.filter
+                                            (\c -> c.sponsorId == newId)
+                                            data
+
+                                _ ->
+                                    Nothing
+
+                        _ ->
+                            Nothing
+
+                newSponsors =
+                    case possibleSponsors of
+                        Just someSponsors ->
+                            model.querySelectedSponsors ++ someSponsors
+
+                        _ ->
+                            model.querySelectedSponsors
+
+                newModel =
+                    { model | querySelectedSponsors = newSponsors }
+            in
+            ( newModel, doSearch newModel )
+
         ConditionsResponse data ->
             ( { model | conditions = data }
             , Cmd.none
@@ -142,6 +191,33 @@ update msg model =
             in
             ( newModel, doSearch newModel )
 
+        RemoveSponsor sponsor ->
+            let
+                newSponsors =
+                    List.filter
+                        (\s -> s.sponsorId /= sponsor.sponsorId)
+                        model.querySelectedSponsors
+
+                newModel =
+                    { model | querySelectedSponsors = newSponsors }
+            in
+            ( newModel, doSearch newModel )
+
+        Reset ->
+            let
+                newModel =
+                    { model
+                        | conditionFilter = Nothing
+                        , searchResults = RemoteData.NotAsked
+                        , sponsorFilter = Nothing
+                        , queryText = Nothing
+                        , querySelectedConditions = []
+                        , querySelectedSponsors = []
+                        , queryDetailedDescription = Nothing
+                    }
+            in
+            ( newModel, Cmd.none )
+
         SummaryResponse data ->
             ( { model | summary = data }
             , Cmd.none
@@ -163,6 +239,20 @@ update msg model =
                             Just (String.toLower text)
             in
             ( { model | conditionFilter = newFilter }
+            , Cmd.none
+            )
+
+        SetSponsorFilter text ->
+            let
+                newFilter =
+                    case String.length text of
+                        0 ->
+                            Nothing
+
+                        _ ->
+                            Just (String.toLower text)
+            in
+            ( { model | sponsorFilter = newFilter }
             , Cmd.none
             )
 
@@ -190,6 +280,9 @@ update msg model =
             in
             ( { model | queryText = newQuery }, Cmd.none )
 
+        SponsorsResponse data ->
+            ( { model | sponsors = data }, Cmd.none )
+
 
 view : Model -> Html Msg
 view model =
@@ -208,11 +301,72 @@ view model =
                 RemoteData.Success data ->
                     "Search " ++ commify data.numStudies ++ " studies"
 
+        empty =
+            [ Select.item [ value "" ] [ text "--Select--" ] ]
+
+        mkSponsorSelect =
+            let
+                filterSponsors sponsors =
+                    let
+                        regex =
+                            case model.sponsorFilter of
+                                Just filter ->
+                                    Just
+                                        (Maybe.withDefault Regex.never
+                                            (Regex.fromString filter)
+                                        )
+
+                                _ ->
+                                    Nothing
+                    in
+                    case regex of
+                        Just re ->
+                            List.filter
+                                (\s ->
+                                    Regex.contains re
+                                        (String.toLower s.sponsorName)
+                                )
+                                sponsors
+
+                        _ ->
+                            []
+
+                mkSelect data =
+                    case List.length data of
+                        0 ->
+                            text ""
+
+                        _ ->
+                            Select.select
+                                [ Select.id "sponsor"
+                                , Select.onChange AddSponsor
+                                ]
+                                (empty ++ List.map mkSelectItem data)
+
+                mkSelectItem sponsor =
+                    Select.item
+                        [ value <|
+                            String.fromInt sponsor.sponsorId
+                        ]
+                        [ text <|
+                            sponsor.sponsorName
+                                ++ " ("
+                                ++ String.fromInt sponsor.numStudies
+                                ++ ")"
+                        ]
+            in
+            case model.sponsors of
+                RemoteData.Success data ->
+                    mkSelect (filterSponsors data)
+
+                RemoteData.Failure httpError ->
+                    text (viewHttpErrorMessage httpError)
+
+                _ ->
+                    text "Error fetching conditions"
+
         mkConditionSelect =
             let
-                empty =
-                    [ Select.item [ value "" ] [ text "--Select--" ] ]
-
                 filterConditions conditions =
                     let
                         regex =
@@ -251,7 +405,10 @@ view model =
                                 (empty ++ List.map mkSelectItem data)
 
                 mkSelectItem condition =
-                    Select.item [ value <| String.fromInt condition.conditionId ]
+                    Select.item
+                        [ value <|
+                            String.fromInt condition.conditionId
+                        ]
                         [ text <|
                             condition.condition
                                 ++ " ("
@@ -276,8 +433,18 @@ view model =
                 ]
                 [ text (condition.condition ++ " ⦻") ]
 
+        viewSponsor sponsor =
+            Button.button
+                [ Button.outlinePrimary
+                , Button.onClick (RemoveSponsor sponsor)
+                ]
+                [ text (sponsor.sponsorName ++ " ⦻") ]
+
         viewSelectedConditions =
             List.map viewCondition model.querySelectedConditions
+
+        viewSelectedSponsors =
+            List.map viewSponsor model.querySelectedSponsors
 
         searchForm =
             Form.form [ onSubmit DoSearch ]
@@ -301,9 +468,21 @@ view model =
                      ]
                         ++ viewSelectedConditions
                     )
+                , Form.group []
+                    ([ Form.label [ for "sponsor" ]
+                        [ text "Sponsor:" ]
+                     , Input.text
+                        [ Input.attrs [ onInput SetSponsorFilter ] ]
+                     , mkSponsorSelect
+                     ]
+                        ++ viewSelectedSponsors
+                    )
                 , Button.button
                     [ Button.primary, Button.onClick DoSearch ]
                     [ text "Submit" ]
+                , Button.button
+                    [ Button.secondary, Button.onClick Reset ]
+                    [ text "Clear" ]
                 ]
 
         results =
@@ -411,6 +590,21 @@ getConditions =
         }
 
 
+getSponsors : Cmd Msg
+getSponsors =
+    let
+        url =
+            apiServer ++ "/sponsors"
+    in
+    Http.get
+        { url = url
+        , expect =
+            Http.expectJson
+                (RemoteData.fromResult >> SponsorsResponse)
+                (Json.Decode.list decoderSponsor)
+        }
+
+
 searchUrl : Model -> Bool -> String
 searchUrl model downloadCsv =
     let
@@ -435,6 +629,19 @@ searchUrl model downloadCsv =
                             )
                         )
 
+        sponsors =
+            case List.length model.querySelectedSponsors of
+                0 ->
+                    Nothing
+
+                _ ->
+                    Just
+                        (String.join ","
+                            (List.map (\s -> String.fromInt s.sponsorId)
+                                model.querySelectedSponsors
+                            )
+                        )
+
         downloadFlag =
             case downloadCsv of
                 True ->
@@ -454,6 +661,9 @@ searchUrl model downloadCsv =
                       )
                     , ( "conditions"
                       , conditions
+                      )
+                    , ( "sponsors"
+                      , sponsors
                       )
                     , ( "download"
                       , downloadFlag
@@ -504,6 +714,14 @@ decoderStudy =
         |> Json.Decode.Pipeline.required "nct_id" string
         |> Json.Decode.Pipeline.required "title" string
         |> Json.Decode.Pipeline.optional "detailed_description" string ""
+
+
+decoderSponsor : Decoder Sponsor
+decoderSponsor =
+    Json.Decode.succeed Sponsor
+        |> Json.Decode.Pipeline.required "sponsor_id" int
+        |> Json.Decode.Pipeline.required "sponsor" string
+        |> Json.Decode.Pipeline.required "num_studies" int
 
 
 subscriptions : Model -> Sub Msg
