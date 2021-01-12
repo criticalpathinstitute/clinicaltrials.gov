@@ -61,10 +61,56 @@ class StudySearchResult(BaseModel):
     detailed_description: str
 
 
+class StudySponsor(BaseModel):
+    sponsor_id: int
+    sponsor_name: str
+
+class StudyCondition(BaseModel):
+    condition_id: int
+    condition: str
+
+class StudyIntervention(BaseModel):
+    intervention_id: int
+    intervention: str
+
 class StudyDetail(BaseModel):
     nct_id: str
-    title: str
+    official_title: str
+    brief_title: str
     detailed_description: str
+    org_study_id: str
+    acronym: str
+    source: str
+    rank: str
+    brief_summary: str
+    overall_status: str
+    last_known_status: str
+    why_stopped: str
+    phase: str
+    study_type: str
+    has_expanded_access: str
+    target_duration: str
+    biospec_retention: str
+    biospec_description: str
+    start_date: str
+    completion_date: str
+    verification_date: str
+    study_first_submitted: str
+    study_first_submitted_qc: str
+    study_first_posted: str
+    results_first_submitted: str
+    results_first_submitted_qc: str
+    results_first_posted: str
+    disposition_first_submitted: str
+    disposition_first_submitted_qc: str
+    disposition_first_posted: str
+    last_update_submitted: str
+    last_update_submitted_qc: str
+    last_update_posted: str
+    primary_completion_date: str
+    sponsors: List[StudySponsor]
+    conditions: List[StudyCondition]
+    interventions: List[StudyIntervention]
 
 
 class Sponsor(BaseModel):
@@ -98,14 +144,8 @@ def search(text: Optional[str] = '',
            detailed_desc: Optional[str] = '',
            download: int = 0):
     """ Search """
-    def f(rec):
-        return StudySearchResult(
-            study_id=rec['study_id'],
-            nct_id=rec['nct_id'],
-            title=rec['official_title'],
-            detailed_description=rec['detailed_description'])
 
-    flds = ['study_id', 'nct_id', 'official_title', 'detailed_description']
+    flds = ['study_id', 'nct_id', 'brief_title', 'detailed_description']
     # proj = {fld: 1 for fld in flds}
     # qry = {}
 
@@ -160,12 +200,12 @@ def search(text: Optional[str] = '',
     where = '\nand '.join(chain.from_iterable(map(lambda x: x['where'],
                                                   where)))
     sql = """
-        select s.study_id, s.nct_id, s.official_title, s.detailed_description
+        select s.study_id, s.nct_id, s.brief_title, s.detailed_description
         from   {}
         where  s.study_id is not null
         and {}
     """.format(table_names, where)
-    print(sql)
+    # print(sql)
 
     res = []
     try:
@@ -178,6 +218,13 @@ def search(text: Optional[str] = '',
 
     if not res:
         return []
+
+    def f(rec):
+        return StudySearchResult(
+            study_id=rec['study_id'],
+            nct_id=rec['nct_id'],
+            title=rec['brief_title'],
+            detailed_description=rec['detailed_description'])
 
     if download:
         stream = io.StringIO()
@@ -212,11 +259,11 @@ def quick_search(term: str):
     """ Search text for keyword """
     def f(rec):
         return StudySearchResult(nct_id=rec['nct_id'],
-                                 title=rec['official_title'])
+                                 title=rec['brief_title'])
 
     cur = get_cur()
     sql = f"""
-        select nct_id, official_title as title
+        select nct_id, brief_title as title
         from   study
         where  text @@ to_tsquery('{term}');
     """
@@ -248,9 +295,69 @@ def study(nct_id: str) -> StudyDetail:
 
     if studies := ct.Study.select().where(ct.Study.nct_id == nct_id):
         study = studies[0]
-        return StudyDetail(nct_id=study.nct_id,
-                           title=study.official_title,
-                           detailed_description=study.detailed_description)
+
+        sponsors = [
+            StudySponsor(sponsor_id=s.sponsor_id,
+                         sponsor_name=s.sponsor.sponsor)
+            for s in ct.StudyToSponsor.select().where(
+                ct.StudyToSponsor.study_id == study.study_id)
+        ]
+
+        conditions = [
+            StudyCondition(condition_id=c.condition_id,
+                         condition=c.condition.condition)
+            for c in ct.StudyToCondition.select().where(
+                ct.StudyToCondition.study_id == study.study_id)
+        ]
+
+        interventions = [
+            StudyIntervention(intervention_id=c.intervention_id,
+                         intervention=c.intervention.intervention)
+            for c in ct.StudyToIntervention.select().where(
+                ct.StudyToIntervention.study_id == study.study_id)
+        ]
+
+        return StudyDetail(
+            nct_id=study.nct_id,
+            official_title=study.official_title,
+            brief_title=study.brief_title,
+            detailed_description=study.detailed_description,
+            org_study_id=study.org_study_id,
+            acronym=study.acronym,
+            source=study.source,
+            rank=study.rank,
+            brief_summary=study.brief_summary,
+            overall_status=study.overall_status,
+            last_known_status=study.last_known_status,
+            why_stopped=study.why_stopped,
+            phase=study.phase,
+            study_type=study.study_type,
+            has_expanded_access=study.has_expanded_access,
+            target_duration=study.target_duration,
+            biospec_retention=study.biospec_retention,
+            biospec_description=study.biospec_description,
+            start_date=str(study.start_date) or '',
+            completion_date=str(study.completion_date) or '',
+            verification_date=str(study.verification_date) or '',
+            study_first_submitted=str(study.study_first_submitted) or '',
+            study_first_submitted_qc=str(study.study_first_submitted_qc) or '',
+            study_first_posted=str(study.study_first_posted) or '',
+            results_first_submitted=str(study.results_first_submitted) or '',
+            results_first_submitted_qc=str(study.results_first_submitted_qc)
+            or '',
+            results_first_posted=str(study.results_first_posted) or '',
+            disposition_first_submitted=str(study.disposition_first_submitted)
+            or '',
+            disposition_first_submitted_qc=str(
+                study.disposition_first_submitted_qc) or '',
+            disposition_first_posted=str(study.disposition_first_posted) or '',
+            last_update_submitted=str(study.last_update_submitted) or '',
+            last_update_submitted_qc=str(study.last_update_submitted_qc) or '',
+            last_update_posted=str(study.last_update_posted) or '',
+            primary_completion_date=str(study.primary_completion_date) or '',
+            sponsors=sponsors,
+            conditions=conditions,
+            interventions=interventions)
 
 
 # --------------------------------------------------

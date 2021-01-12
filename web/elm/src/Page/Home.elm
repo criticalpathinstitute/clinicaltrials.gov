@@ -13,7 +13,7 @@ import Common exposing (commify, viewHttpErrorMessage)
 import Config exposing (apiServer)
 import Debug
 import File.Download as Download
-import Html exposing (Html, a, br, div, h1, text)
+import Html exposing (Html, a, b, br, div, h1, text)
 import Html.Attributes exposing (class, for, href, target, value)
 import Html.Events exposing (onInput, onSubmit)
 import Http
@@ -501,14 +501,14 @@ view model =
                         mkRow study =
                             tr []
                                 [ td []
-                                    [ a
+                                    [ b [] [ text study.title ]
+                                    , br [] []
+                                    , a
                                         [ Route.href
                                             (Route.Study study.nctId)
                                         , target "_blank"
                                         ]
-                                        [ text study.title ]
-                                    , br [] []
-                                    , text study.nctId
+                                        [ text study.nctId ]
                                     , br [] []
                                     , text
                                         (truncate
