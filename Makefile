@@ -10,6 +10,7 @@ orm:
 dump:
 	pg_dump $(DB) > dumps/$(DB).sql
 	mongoexport --out dumps/ct_mongo.json --db $(DB) --collection ct
+	zip -r ~/Downloads/ct.zip dumps
 
 # 1. Download all the data
 data:
