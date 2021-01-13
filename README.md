@@ -1,6 +1,6 @@
 # Critical Path Search Interface for ClinicalTrials.gov Data
 
-This is a mirror of the ClinicalTrials.gov database.
+This is a mirror of the ClinicalTrials.gov database running at http://ct.c-path.org.
 
 ## Code
 
