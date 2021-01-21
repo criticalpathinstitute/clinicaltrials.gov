@@ -23,8 +23,8 @@ one:
 some:
 	./scripts/xml2json.py -s $(SCHEMA) -d xml/NCT014* -o json
 
-json:
-	#./scripts/xml2json.py -d xml -o json
+alljson:
+	./scripts/xml2json.py -s $(SCHEMA) -d xml -o json
 
 # 3. Import JSON into Mongo
 mongo:
