@@ -56,6 +56,24 @@ create table study_to_condition (
     foreign key (condition_id) references condition (condition_id) on delete cascade
 );
 
+drop table if exists study_doc;
+create table study_doc (
+    study_doc_id SERIAL PRIMARY KEY,
+    doc_id varchar(255),
+    doc_type varchar(255),
+    doc_url varchar(255),
+    doc_comment varchar(255)
+);
+
+drop table if exists study_to_study_doc;
+create table study_to_study_doc (
+    study_to_study_doc_id SERIAL PRIMARY KEY,
+    study_id INT NOT NULL,
+    study_doc_id INT NOT NULL,
+    foreign key (study_id) references study (study_id) on delete cascade,
+    foreign key (study_doc_id) references study_doc (study_doc_id) on delete cascade
+);
+
 drop table if exists keyword;
 create table keyword (
     keyword_id SERIAL PRIMARY KEY,

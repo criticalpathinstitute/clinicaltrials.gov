@@ -65,15 +65,19 @@ class StudySponsor(BaseModel):
     sponsor_id: int
     sponsor_name: str
 
+
 class StudyCondition(BaseModel):
     condition_id: int
     condition: str
+
 
 class StudyIntervention(BaseModel):
     intervention_id: int
     intervention: str
 
+
 class StudyDetail(BaseModel):
+    study_id: int
     nct_id: str
     official_title: str
     brief_title: str
@@ -137,12 +141,57 @@ def get_cur():
 
 
 # --------------------------------------------------
+@app.get('/download', response_model=List[StudySearchResult])
+def download(study_ids: str) -> List[StudySearchResult]:
+    """ Download """
+
+    sql = """
+        select s.study_id, s.nct_id, s.brief_title, s.detailed_description
+        from   study s
+        where  s.study_id in ({})
+    """.format(study_ids)
+    print(sql)
+
+    res = []
+    try:
+        cur = get_cur()
+        cur.execute(sql)
+        res = cur.fetchall()
+        cur.close()
+    except:
+        dbh.rollback()
+
+    if not res:
+        return []
+
+    def f(rec):
+        return StudySearchResult(
+            study_id=rec['study_id'],
+            nct_id=rec['nct_id'],
+            title=rec['brief_title'],
+            detailed_description=rec['detailed_description'])
+
+    flds = ['study_id', 'nct_id', 'brief_title', 'detailed_description']
+    stream = io.StringIO()
+    writer = csv.DictWriter(stream, fieldnames=flds, delimiter=',')
+    writer.writeheader()
+    for row in res:
+        writer.writerow({f: row[f] for f in flds})
+
+    response = StreamingResponse(iter([stream.getvalue()]),
+                                 media_type="text/csv")
+    response.headers[
+        "Content-Disposition"] = "attachment; filename=download.csv"
+    return response
+
+
+# --------------------------------------------------
 @app.get('/search', response_model=List[StudySearchResult])
 def search(text: Optional[str] = '',
            conditions: Optional[str] = '',
            sponsors: Optional[str] = '',
            detailed_desc: Optional[str] = '',
-           download: int = 0):
+           download: int = 0) -> List[StudySearchResult]:
     """ Search """
 
     flds = ['study_id', 'nct_id', 'brief_title', 'detailed_description']
@@ -226,21 +275,8 @@ def search(text: Optional[str] = '',
             title=rec['brief_title'],
             detailed_description=rec['detailed_description'])
 
-    if download:
-        stream = io.StringIO()
-        writer = csv.DictWriter(stream, fieldnames=flds, delimiter=',')
-        writer.writeheader()
-        for row in res:
-            writer.writerow({f: row[f] for f in flds})
-
-        response = StreamingResponse(iter([stream.getvalue()]),
-                                     media_type="text/csv")
-        response.headers[
-            "Content-Disposition"] = "attachment; filename=download.csv"
-        return response
-    else:
-        return list(map(f, res))
-        # return list(map(lambda r: StudySearchResult(**dict(r)), res))
+    return list(map(f, res))
+    # return list(map(lambda r: StudySearchResult(**dict(r)), res))
 
 
 # --------------------------------------------------
@@ -305,19 +341,20 @@ def study(nct_id: str) -> StudyDetail:
 
         conditions = [
             StudyCondition(condition_id=c.condition_id,
-                         condition=c.condition.condition)
+                           condition=c.condition.condition)
             for c in ct.StudyToCondition.select().where(
                 ct.StudyToCondition.study_id == study.study_id)
         ]
 
         interventions = [
             StudyIntervention(intervention_id=c.intervention_id,
-                         intervention=c.intervention.intervention)
+                              intervention=c.intervention.intervention)
             for c in ct.StudyToIntervention.select().where(
                 ct.StudyToIntervention.study_id == study.study_id)
         ]
 
         return StudyDetail(
+            study_id=study.study_id,
             nct_id=study.nct_id,
             official_title=study.official_title,
             brief_title=study.brief_title,

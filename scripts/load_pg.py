@@ -125,6 +125,11 @@ def main() -> None:
             s2k, _ = StudyToKeyword.get_or_create(study_id=study.study_id,
                                                   keyword_id=kw.keyword_id)
 
+        for doc in data.get('study_docs'):
+            kw, _ = StudyDoc.get_or_create(keyword=keyword)
+            s2k, _ = StudyDocToKeyword.get_or_create(study_id=study.study_id,
+                                                  keyword_id=kw.keyword_id)
+
         if interventions := data.get('interventions'):
             for intervention in interventions:
                 int_, _ = Intervention.get_or_create(

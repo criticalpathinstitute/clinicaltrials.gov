@@ -82,6 +82,13 @@ class Study(BaseModel):
             ((), False),
         )
 
+class StudyDoc(BaseModel):
+    study_doc = CharField(null=True)
+    study_doc_id = AutoField()
+
+    class Meta:
+        table_name = 'study_doc'
+
 class StudyToCondition(BaseModel):
     condition = ForeignKeyField(column_name='condition_id', field='condition_id', model=Condition)
     study = ForeignKeyField(column_name='study_id', field='study_id', model=Study)
@@ -113,4 +120,12 @@ class StudyToSponsor(BaseModel):
 
     class Meta:
         table_name = 'study_to_sponsor'
+
+class StudyToStudyDoc(BaseModel):
+    study_doc = ForeignKeyField(column_name='study_doc_id', field='study_doc_id', model=StudyDoc)
+    study = ForeignKeyField(column_name='study_id', field='study_id', model=Study)
+    study_to_study_doc_id = AutoField()
+
+    class Meta:
+        table_name = 'study_to_study_doc'
 

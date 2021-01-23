@@ -1,5 +1,6 @@
 module Page.Home exposing (Model, Msg, init, subscriptions, update, view)
 
+import Bootstrap.Badge as Badge
 import Bootstrap.Button as Button
 import Bootstrap.Form as Form
 import Bootstrap.Form.Checkbox as Checkbox
@@ -13,15 +14,16 @@ import Common exposing (commify, viewHttpErrorMessage)
 import Config exposing (apiServer)
 import Debug
 import File.Download as Download
-import Html exposing (Html, a, b, br, div, h1, text)
-import Html.Attributes exposing (class, for, href, target, value)
-import Html.Events exposing (onInput, onSubmit)
+import Html exposing (Html, a, b, br, div, h1, img, text)
+import Html.Attributes exposing (class, for, href, src, target, value)
+import Html.Events exposing (onClick, onInput, onSubmit)
 import Http
 import Json.Decode exposing (Decoder, field, float, int, nullable, string)
 import Json.Decode.Pipeline exposing (hardcoded, optional, required)
 import Regex
 import RemoteData exposing (RemoteData, WebData)
 import Route
+import Set
 import Task
 import Url.Builder
 
@@ -33,6 +35,7 @@ type alias Model =
     , searchResults : WebData (List Study)
     , sponsors : WebData (List Sponsor)
     , sponsorFilter : Maybe String
+    , selectedStudies : List Study
     , queryText : Maybe String
     , querySelectedConditions : List Condition
     , querySelectedSponsors : List Sponsor
@@ -60,7 +63,8 @@ type alias Summary =
 
 
 type alias Study =
-    { nctId : String
+    { studyId : Int
+    , nctId : String
     , title : String
     , detailedDescription : String
     }
@@ -69,9 +73,11 @@ type alias Study =
 type Msg
     = AddCondition String
     | AddSponsor String
+    | AddAllStudies
+    | AddStudy Study
     | ConditionsResponse (WebData (List Condition))
     | DoSearch
-    | Download
+    | DownloadStudies
     | RemoveCondition Condition
     | RemoveSponsor Sponsor
     | Reset
@@ -91,6 +97,7 @@ initialModel =
     , searchResults = RemoteData.NotAsked
     , sponsors = RemoteData.NotAsked
     , sponsorFilter = Nothing
+    , selectedStudies = []
     , queryText = Nothing
     , querySelectedConditions = []
     , querySelectedSponsors = []
@@ -113,10 +120,18 @@ update msg model =
                         Just newId ->
                             case model.conditions of
                                 RemoteData.Success data ->
-                                    Just <|
-                                        List.filter
-                                            (\c -> c.conditionId == newId)
-                                            data
+                                    case newId > 0 of
+                                        True ->
+                                            Just <|
+                                                List.filter
+                                                    (\c -> c.conditionId == newId)
+                                                    data
+
+                                        _ ->
+                                            Just <|
+                                                filteredConditions
+                                                    data
+                                                    model.conditionFilter
 
                                 _ ->
                                     Nothing
@@ -168,6 +183,49 @@ update msg model =
             in
             ( newModel, doSearch newModel )
 
+        AddAllStudies ->
+            let
+                currentlySelected =
+                    Set.fromList <|
+                        List.map (\s -> s.studyId) model.selectedStudies
+
+                newStudies =
+                    case model.searchResults of
+                        RemoteData.Success data ->
+                            List.filter
+                                (\s ->
+                                    not
+                                        (Set.member s.studyId currentlySelected)
+                                )
+                                data
+
+                        _ ->
+                            []
+            in
+            ( { model
+                | selectedStudies = model.selectedStudies ++ newStudies
+              }
+            , Cmd.none
+            )
+
+        AddStudy study ->
+            let
+                currentIds =
+                    Set.fromList <|
+                        List.map (\s -> s.studyId) model.selectedStudies
+
+                newStudies =
+                    case Set.member study.studyId currentIds of
+                        False ->
+                            [ study ]
+
+                        _ ->
+                            []
+            in
+            ( { model | selectedStudies = model.selectedStudies ++ newStudies }
+            , Cmd.none
+            )
+
         ConditionsResponse data ->
             ( { model | conditions = data }
             , Cmd.none
@@ -176,8 +234,17 @@ update msg model =
         DoSearch ->
             ( model, doSearch model )
 
-        Download ->
-            ( model, Download.url (searchUrl model True) )
+        DownloadStudies ->
+            let
+                studyIds =
+                    String.join "," <|
+                        List.map (\s -> String.fromInt s.studyId)
+                            model.selectedStudies
+
+                url =
+                    apiServer ++ "/download?study_ids=" ++ studyIds
+            in
+            ( model, Download.url url )
 
         RemoveCondition condition ->
             let
@@ -304,6 +371,9 @@ view model =
         empty =
             [ Select.item [ value "" ] [ text "--Select--" ] ]
 
+        addAll =
+            [ Select.item [ value "-1" ] [ text "[All]" ] ]
+
         mkSponsorSelect =
             let
                 filterSponsors sponsors =
@@ -363,35 +433,10 @@ view model =
                     text (viewHttpErrorMessage httpError)
 
                 _ ->
-                    text "Error fetching conditions"
+                    text "Loading sponsors..."
 
         mkConditionSelect =
             let
-                filterConditions conditions =
-                    let
-                        regex =
-                            case model.conditionFilter of
-                                Just filter ->
-                                    Just
-                                        (Maybe.withDefault Regex.never
-                                            (Regex.fromString filter)
-                                        )
-
-                                _ ->
-                                    Nothing
-                    in
-                    case regex of
-                        Just re ->
-                            List.filter
-                                (\c ->
-                                    Regex.contains re
-                                        (String.toLower c.condition)
-                                )
-                                conditions
-
-                        _ ->
-                            []
-
                 mkSelect data =
                     case List.length data of
                         0 ->
@@ -418,13 +463,13 @@ view model =
             in
             case model.conditions of
                 RemoteData.Success data ->
-                    mkSelect (filterConditions data)
+                    mkSelect (filteredConditions data model.conditionFilter)
 
                 RemoteData.Failure httpError ->
                     text (viewHttpErrorMessage httpError)
 
                 _ ->
-                    text "Error fetching conditions"
+                    text "Loading conditions..."
 
         viewCondition condition =
             Button.button
@@ -433,6 +478,10 @@ view model =
                 ]
                 [ text (condition.condition ++ " ⦻") ]
 
+        --viewCondition condition =
+        --    a
+        --        [ onClick (RemoveCondition condition) ]
+        --        [ text (condition.condition ++ " ⦻") ]
         viewSponsor sponsor =
             Button.button
                 [ Button.outlinePrimary
@@ -448,8 +497,7 @@ view model =
 
         searchForm =
             Form.form [ onSubmit DoSearch ]
-                [ Form.label [] [ text summary ]
-                , Form.group []
+                [ Form.group []
                     [ Form.label [ for "text" ] [ text "Text:" ]
                     , Input.text
                         [ Input.attrs [ onInput SetQueryText ] ]
@@ -501,7 +549,12 @@ view model =
                         mkRow study =
                             tr []
                                 [ td []
-                                    [ b [] [ text study.title ]
+                                    [ Button.button
+                                        [ Button.outlineSecondary
+                                        , Button.onClick (AddStudy study)
+                                        ]
+                                        [ text "Add" ]
+                                    , b [] [ text study.title ]
                                     , br [] []
                                     , a
                                         [ Route.href
@@ -534,9 +587,9 @@ view model =
                                         _ ->
                                             [ Button.button
                                                 [ Button.outlinePrimary
-                                                , Button.onClick Download
+                                                , Button.onClick AddAllStudies
                                                 ]
-                                                [ text "Download" ]
+                                                [ text "Add All" ]
                                             , table
                                                 { options =
                                                     [ Bootstrap.Table.striped ]
@@ -550,15 +603,60 @@ view model =
                             [ h1 [] [ text title ] ] ++ body
                     in
                     div [] resultsDiv
+
+        numSelectedStudies =
+            List.length model.selectedStudies
     in
     Grid.container []
         [ Grid.row [ Row.centerMd ]
+            [ Grid.col
+                [ Col.xs, Col.md8 ]
+                [ text summary ]
+            , Grid.col
+                [ Col.xs6, Col.md4 ]
+                [ img
+                    [ src "/assets/images/cart.png"
+                    , onClick DownloadStudies
+                    ]
+                    []
+                , Badge.badgeSecondary []
+                    [ text (String.fromInt numSelectedStudies) ]
+                ]
+            ]
+        , Grid.row []
             [ Grid.col [ Col.mdAuto ] [ searchForm ]
             ]
         , Grid.row []
             [ Grid.col [] [ results ]
             ]
         ]
+
+
+filteredConditions : List Condition -> Maybe String -> List Condition
+filteredConditions conditions conditionFilter =
+    let
+        regex =
+            case conditionFilter of
+                Just filter ->
+                    Just
+                        (Maybe.withDefault Regex.never
+                            (Regex.fromString filter)
+                        )
+
+                _ ->
+                    Nothing
+    in
+    case regex of
+        Just re ->
+            List.filter
+                (\c ->
+                    Regex.contains re
+                        (String.toLower c.condition)
+                )
+                conditions
+
+        _ ->
+            []
 
 
 getSummary : Cmd Msg
@@ -712,6 +810,7 @@ decoderSummary =
 decoderStudy : Decoder Study
 decoderStudy =
     Json.Decode.succeed Study
+        |> Json.Decode.Pipeline.required "study_id" int
         |> Json.Decode.Pipeline.required "nct_id" string
         |> Json.Decode.Pipeline.required "title" string
         |> Json.Decode.Pipeline.optional "detailed_description" string ""
