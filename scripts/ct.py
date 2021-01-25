@@ -23,13 +23,6 @@ class Intervention(BaseModel):
     class Meta:
         table_name = 'intervention'
 
-class Keyword(BaseModel):
-    keyword = CharField(null=True)
-    keyword_id = AutoField()
-
-    class Meta:
-        table_name = 'keyword'
-
 class Sponsor(BaseModel):
     sponsor = CharField(null=True)
     sponsor_id = AutoField()
@@ -83,11 +76,25 @@ class Study(BaseModel):
         )
 
 class StudyDoc(BaseModel):
-    study_doc = CharField(null=True)
+    doc_comment = CharField(null=True)
+    doc_id = CharField(null=True)
+    doc_type = CharField(null=True)
+    doc_url = CharField(null=True)
     study_doc_id = AutoField()
 
     class Meta:
         table_name = 'study_doc'
+
+class StudyOutcome(BaseModel):
+    description = TextField(null=True)
+    measure = TextField(null=True)
+    outcome_type = CharField(null=True)
+    study = ForeignKeyField(column_name='study_id', field='study_id', model=Study)
+    study_outcome_id = AutoField()
+    time_frame = TextField(null=True)
+
+    class Meta:
+        table_name = 'study_outcome'
 
 class StudyToCondition(BaseModel):
     condition = ForeignKeyField(column_name='condition_id', field='condition_id', model=Condition)
@@ -104,14 +111,6 @@ class StudyToIntervention(BaseModel):
 
     class Meta:
         table_name = 'study_to_intervention'
-
-class StudyToKeyword(BaseModel):
-    keyword = ForeignKeyField(column_name='keyword_id', field='keyword_id', model=Keyword)
-    study = ForeignKeyField(column_name='study_id', field='study_id', model=Study)
-    study_to_keyword_id = AutoField()
-
-    class Meta:
-        table_name = 'study_to_keyword'
 
 class StudyToSponsor(BaseModel):
     sponsor = ForeignKeyField(column_name='sponsor_id', field='sponsor_id', model=Sponsor)

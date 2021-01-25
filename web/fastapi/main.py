@@ -96,6 +96,7 @@ class StudyDetail(BaseModel):
     target_duration: str
     biospec_retention: str
     biospec_description: str
+    keywords: str
     start_date: str
     completion_date: str
     verification_date: str
@@ -290,28 +291,6 @@ def make_bool(s: str):
 
 
 # --------------------------------------------------
-@app.get('/quick_search/{term}', response_model=List[StudySearchResult])
-def quick_search(term: str):
-    """ Search text for keyword """
-    def f(rec):
-        return StudySearchResult(nct_id=rec['nct_id'],
-                                 title=rec['brief_title'])
-
-    cur = get_cur()
-    sql = f"""
-        select nct_id, brief_title as title
-        from   study
-        where  text @@ to_tsquery('{term}');
-    """
-    cur.execute(sql)
-    res = cur.fetchall()
-    studies = list(map(lambda r: StudySearchResult(**dict(r)), res))
-    cur.close()
-
-    return studies
-
-
-# --------------------------------------------------
 @app.get('/summary', response_model=Summary)
 def summary():
     """ DB summary stats """
@@ -373,6 +352,7 @@ def study(nct_id: str) -> StudyDetail:
             target_duration=study.target_duration,
             biospec_retention=study.biospec_retention,
             biospec_description=study.biospec_description,
+            keywords=study.keywords,
             start_date=str(study.start_date) or '',
             completion_date=str(study.completion_date) or '',
             verification_date=str(study.verification_date) or '',
