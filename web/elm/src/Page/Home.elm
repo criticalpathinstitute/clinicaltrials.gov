@@ -10,6 +10,7 @@ import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Grid.Row as Row
 import Bootstrap.Table exposing (table, tbody, td, th, thead, tr)
+import Bootstrap.Utilities.Spacing as Spacing
 import Common exposing (commify, viewHttpErrorMessage)
 import Config exposing (apiServer)
 import Debug
@@ -34,18 +35,26 @@ type alias Model =
     , conditions : WebData (List Condition)
     , searchResults : WebData (List Study)
     , sponsors : WebData (List Sponsor)
+    , phases : WebData (List Phase)
     , sponsorFilter : Maybe String
     , selectedStudies : List Study
     , queryText : Maybe String
     , querySelectedConditions : List Condition
+    , querySelectedPhases : List Phase
     , querySelectedSponsors : List Sponsor
-    , queryDetailedDescription : Maybe String
     }
 
 
 type alias Condition =
     { conditionId : Int
     , condition : String
+    , numStudies : Int
+    }
+
+
+type alias Phase =
+    { phaseId : Int
+    , phase : String
     , numStudies : Int
     }
 
@@ -72,6 +81,7 @@ type alias Study =
 
 type Msg
     = AddCondition String
+    | AddPhase String
     | AddSponsor String
     | AddAllStudies
     | AddStudy Study
@@ -80,11 +90,12 @@ type Msg
     | DownloadStudies
     | RemoveCondition Condition
     | RemoveSponsor Sponsor
+    | RemovePhase Phase
     | Reset
+    | PhasesResponse (WebData (List Phase))
     | SummaryResponse (WebData Summary)
     | SetConditionFilter String
     | SetSponsorFilter String
-    | SetQueryDetailedDescription String
     | SetQueryText String
     | SearchResponse (WebData (List Study))
     | SponsorsResponse (WebData (List Sponsor))
@@ -95,19 +106,20 @@ initialModel =
     , conditionFilter = Nothing
     , conditions = RemoteData.NotAsked
     , searchResults = RemoteData.NotAsked
+    , phases = RemoteData.NotAsked
     , sponsors = RemoteData.NotAsked
     , sponsorFilter = Nothing
     , selectedStudies = []
     , queryText = Nothing
     , querySelectedConditions = []
+    , querySelectedPhases = []
     , querySelectedSponsors = []
-    , queryDetailedDescription = Nothing
     }
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( initialModel, Cmd.batch [ getSummary, getConditions, getSponsors ] )
+    ( initialModel, Cmd.batch [ getSummary, getConditions, getSponsors, getPhases ] )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -149,6 +161,38 @@ update msg model =
 
                 newModel =
                     { model | querySelectedConditions = newConditions }
+            in
+            ( newModel, doSearch newModel )
+
+        AddPhase phaseId ->
+            let
+                currentPhaseIds =
+                    Set.fromList <|
+                        List.map (\p -> p.phaseId) model.querySelectedPhases
+
+                currentPhases =
+                    case model.phases of
+                        RemoteData.Success data ->
+                            data
+
+                        _ ->
+                            []
+
+                newPhases =
+                    case String.toInt phaseId of
+                        Just newId ->
+                            let
+                                newPhaseIds =
+                                    Set.insert newId currentPhaseIds
+                            in
+                            List.filter (\p -> Set.member p.phaseId newPhaseIds)
+                                currentPhases
+
+                        _ ->
+                            currentPhases
+
+                newModel =
+                    { model | querySelectedPhases = newPhases }
             in
             ( newModel, doSearch newModel )
 
@@ -232,7 +276,7 @@ update msg model =
             )
 
         DoSearch ->
-            ( model, doSearch model )
+            ( { model | searchResults = RemoteData.Loading }, doSearch model )
 
         DownloadStudies ->
             let
@@ -246,6 +290,11 @@ update msg model =
             in
             ( model, Download.url url )
 
+        PhasesResponse data ->
+            ( { model | phases = data }
+            , Cmd.none
+            )
+
         RemoveCondition condition ->
             let
                 newConditions =
@@ -255,6 +304,18 @@ update msg model =
 
                 newModel =
                     { model | querySelectedConditions = newConditions }
+            in
+            ( newModel, doSearch newModel )
+
+        RemovePhase newPhase ->
+            let
+                newPhases =
+                    List.filter
+                        (\phase -> phase /= newPhase)
+                        model.querySelectedPhases
+
+                newModel =
+                    { model | querySelectedPhases = newPhases }
             in
             ( newModel, doSearch newModel )
 
@@ -279,8 +340,8 @@ update msg model =
                         , sponsorFilter = Nothing
                         , queryText = Nothing
                         , querySelectedConditions = []
+                        , querySelectedPhases = []
                         , querySelectedSponsors = []
-                        , queryDetailedDescription = Nothing
                     }
             in
             ( newModel, Cmd.none )
@@ -323,18 +384,6 @@ update msg model =
             , Cmd.none
             )
 
-        SetQueryDetailedDescription desc ->
-            let
-                newDesc =
-                    case String.length desc of
-                        0 ->
-                            Nothing
-
-                        _ ->
-                            Just desc
-            in
-            ( { model | queryDetailedDescription = newDesc }, Cmd.none )
-
         SetQueryText query ->
             let
                 newQuery =
@@ -373,6 +422,40 @@ view model =
 
         addAll =
             [ Select.item [ value "-1" ] [ text "[All]" ] ]
+
+        mkPhasesSelect =
+            let
+                mkSelect data =
+                    case List.length data of
+                        0 ->
+                            text "No phases"
+
+                        _ ->
+                            Select.select
+                                [ Select.id "phase"
+                                , Select.onChange AddPhase
+                                ]
+                                (empty ++ List.map mkSelectItem data)
+
+                mkSelectItem phase =
+                    Select.item
+                        [ value <| String.fromInt phase.phaseId ]
+                        [ text <|
+                            phase.phase
+                                ++ " ("
+                                ++ String.fromInt phase.numStudies
+                                ++ ")"
+                        ]
+            in
+            case model.phases of
+                RemoteData.Success data ->
+                    mkSelect data
+
+                RemoteData.Failure httpError ->
+                    text (viewHttpErrorMessage httpError)
+
+                _ ->
+                    text "Loading phases..."
 
         mkSponsorSelect =
             let
@@ -489,11 +572,21 @@ view model =
                 ]
                 [ text (sponsor.sponsorName ++ " ⦻") ]
 
+        viewPhase phase =
+            Button.button
+                [ Button.outlinePrimary
+                , Button.onClick (RemovePhase phase)
+                ]
+                [ text (phase.phase ++ " ⦻") ]
+
         viewSelectedConditions =
             List.map viewCondition model.querySelectedConditions
 
         viewSelectedSponsors =
             List.map viewSponsor model.querySelectedSponsors
+
+        viewSelectedPhases =
+            List.map viewPhase model.querySelectedPhases
 
         searchForm =
             Form.form [ onSubmit DoSearch ]
@@ -503,10 +596,12 @@ view model =
                         [ Input.attrs [ onInput SetQueryText ] ]
                     ]
                 , Form.group []
-                    [ Form.label [ for "text" ] [ text "Detailed Description:" ]
-                    , Input.text
-                        [ Input.attrs [ onInput SetQueryDetailedDescription ] ]
-                    ]
+                    ([ Form.label [ for "phases" ]
+                        [ text "Phase:" ]
+                     , mkPhasesSelect
+                     ]
+                        ++ viewSelectedPhases
+                    )
                 , Form.group []
                     ([ Form.label [ for "condition" ]
                         [ text "Condition:" ]
@@ -526,10 +621,16 @@ view model =
                         ++ viewSelectedSponsors
                     )
                 , Button.button
-                    [ Button.primary, Button.onClick DoSearch ]
+                    [ Button.primary
+                    , Button.onClick DoSearch
+                    , Button.attrs [ Spacing.mx1 ]
+                    ]
                     [ text "Submit" ]
                 , Button.button
-                    [ Button.secondary, Button.onClick Reset ]
+                    [ Button.secondary
+                    , Button.onClick Reset
+                    , Button.attrs [ Spacing.mx1 ]
+                    ]
                     [ text "Clear" ]
                 ]
 
@@ -539,7 +640,7 @@ view model =
                     div [] [ text "" ]
 
                 RemoteData.Loading ->
-                    div [] [ text "Loading..." ]
+                    div [] [ img [ src "/assets/images/loading.gif" ] [] ]
 
                 RemoteData.Failure httpError ->
                     div [] [ text (viewHttpErrorMessage httpError) ]
@@ -554,7 +655,9 @@ view model =
                                         , Button.onClick (AddStudy study)
                                         ]
                                         [ text "Add" ]
-                                    , b [] [ text study.title ]
+                                    ]
+                                , td []
+                                    [ b [] [ text study.title ]
                                     , br [] []
                                     , a
                                         [ Route.href
@@ -661,12 +764,8 @@ filteredConditions conditions conditionFilter =
 
 getSummary : Cmd Msg
 getSummary =
-    let
-        url =
-            apiServer ++ "/summary"
-    in
     Http.get
-        { url = url
+        { url = apiServer ++ "/summary"
         , expect =
             Http.expectJson
                 (RemoteData.fromResult >> SummaryResponse)
@@ -676,12 +775,8 @@ getSummary =
 
 getConditions : Cmd Msg
 getConditions =
-    let
-        url =
-            apiServer ++ "/conditions"
-    in
     Http.get
-        { url = url
+        { url = apiServer ++ "/conditions"
         , expect =
             Http.expectJson
                 (RemoteData.fromResult >> ConditionsResponse)
@@ -689,14 +784,21 @@ getConditions =
         }
 
 
+getPhases : Cmd Msg
+getPhases =
+    Http.get
+        { url = apiServer ++ "/phases"
+        , expect =
+            Http.expectJson
+                (RemoteData.fromResult >> PhasesResponse)
+                (Json.Decode.list decoderPhase)
+        }
+
+
 getSponsors : Cmd Msg
 getSponsors =
-    let
-        url =
-            apiServer ++ "/sponsors"
-    in
     Http.get
-        { url = url
+        { url = apiServer ++ "/sponsors"
         , expect =
             Http.expectJson
                 (RemoteData.fromResult >> SponsorsResponse)
@@ -704,8 +806,8 @@ getSponsors =
         }
 
 
-searchUrl : Model -> Bool -> String
-searchUrl model downloadCsv =
+doSearch : Model -> Cmd Msg
+doSearch model =
     let
         builder ( label, value ) =
             case value of
@@ -741,13 +843,18 @@ searchUrl model downloadCsv =
                             )
                         )
 
-        downloadFlag =
-            case downloadCsv of
-                True ->
-                    Just "1"
+        phases =
+            case List.length model.querySelectedPhases of
+                0 ->
+                    Nothing
 
                 _ ->
-                    Nothing
+                    Just
+                        (String.join ","
+                            (List.map (\p -> String.fromInt p.phaseId)
+                                model.querySelectedPhases
+                            )
+                        )
 
         queryParams =
             Url.Builder.toQuery <|
@@ -755,8 +862,8 @@ searchUrl model downloadCsv =
                     [ ( "text"
                       , model.queryText
                       )
-                    , ( "detailed_desc"
-                      , model.queryDetailedDescription
+                    , ( "phases"
+                      , phases
                       )
                     , ( "conditions"
                       , conditions
@@ -764,18 +871,13 @@ searchUrl model downloadCsv =
                     , ( "sponsors"
                       , sponsors
                       )
-                    , ( "download"
-                      , downloadFlag
-                      )
                     ]
+
+        searchUrl =
+            apiServer ++ "/search/" ++ queryParams
     in
-    apiServer ++ "/search/" ++ queryParams
-
-
-doSearch : Model -> Cmd Msg
-doSearch model =
     Http.get
-        { url = searchUrl model False
+        { url = searchUrl
         , expect =
             Http.expectJson
                 (RemoteData.fromResult >> SearchResponse)
@@ -798,6 +900,14 @@ decoderCondition =
     Json.Decode.succeed Condition
         |> Json.Decode.Pipeline.required "condition_id" int
         |> Json.Decode.Pipeline.required "condition" string
+        |> Json.Decode.Pipeline.required "num_studies" int
+
+
+decoderPhase : Decoder Phase
+decoderPhase =
+    Json.Decode.succeed Phase
+        |> Json.Decode.Pipeline.required "phase_id" int
+        |> Json.Decode.Pipeline.required "phase" string
         |> Json.Decode.Pipeline.required "num_studies" int
 
 

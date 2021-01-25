@@ -10,28 +10,28 @@ class BaseModel(Model):
         database = database
 
 class Condition(BaseModel):
-    condition = CharField(null=True)
+    condition = CharField(null=True, unique=True)
     condition_id = AutoField()
 
     class Meta:
         table_name = 'condition'
 
 class Intervention(BaseModel):
-    intervention = CharField(null=True)
+    intervention = CharField(null=True, unique=True)
     intervention_id = AutoField()
 
     class Meta:
         table_name = 'intervention'
 
-class Keyword(BaseModel):
-    keyword = CharField(null=True)
-    keyword_id = AutoField()
+class Phase(BaseModel):
+    phase = CharField(null=True, unique=True)
+    phase_id = AutoField()
 
     class Meta:
-        table_name = 'keyword'
+        table_name = 'phase'
 
 class Sponsor(BaseModel):
-    sponsor = CharField(null=True)
+    sponsor = CharField(null=True, unique=True)
     sponsor_id = AutoField()
 
     class Meta:
@@ -49,6 +49,7 @@ class Study(BaseModel):
     disposition_first_submitted = DateField(null=True)
     disposition_first_submitted_qc = DateField(null=True)
     has_expanded_access = TextField(null=True)
+    keywords = TextField(null=True)
     last_known_status = TextField(null=True)
     last_update_posted = DateField(null=True)
     last_update_submitted = DateField(null=True)
@@ -57,7 +58,7 @@ class Study(BaseModel):
     official_title = TextField(null=True)
     org_study_id = TextField(null=True)
     overall_status = TextField(null=True)
-    phase = TextField(null=True)
+    phase = ForeignKeyField(column_name='phase_id', field='phase_id', model=Phase)
     primary_completion_date = DateField(null=True)
     rank = TextField(null=True)
     results_first_posted = DateField(null=True)
@@ -82,6 +83,28 @@ class Study(BaseModel):
             ((), False),
         )
 
+class StudyDoc(BaseModel):
+    doc_comment = TextField(null=True)
+    doc_id = CharField(null=True)
+    doc_type = CharField(null=True)
+    doc_url = TextField(null=True)
+    study_doc_id = AutoField()
+    study = ForeignKeyField(column_name='study_id', field='study_id', model=Study)
+
+    class Meta:
+        table_name = 'study_doc'
+
+class StudyOutcome(BaseModel):
+    description = TextField(null=True)
+    measure = TextField(null=True)
+    outcome_type = CharField(null=True)
+    study = ForeignKeyField(column_name='study_id', field='study_id', model=Study)
+    study_outcome_id = AutoField()
+    time_frame = TextField(null=True)
+
+    class Meta:
+        table_name = 'study_outcome'
+
 class StudyToCondition(BaseModel):
     condition = ForeignKeyField(column_name='condition_id', field='condition_id', model=Condition)
     study = ForeignKeyField(column_name='study_id', field='study_id', model=Study)
@@ -97,14 +120,6 @@ class StudyToIntervention(BaseModel):
 
     class Meta:
         table_name = 'study_to_intervention'
-
-class StudyToKeyword(BaseModel):
-    keyword = ForeignKeyField(column_name='keyword_id', field='keyword_id', model=Keyword)
-    study = ForeignKeyField(column_name='study_id', field='study_id', model=Study)
-    study_to_keyword_id = AutoField()
-
-    class Meta:
-        table_name = 'study_to_keyword'
 
 class StudyToSponsor(BaseModel):
     sponsor = ForeignKeyField(column_name='sponsor_id', field='sponsor_id', model=Sponsor)

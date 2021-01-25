@@ -1,6 +1,14 @@
+drop table if exists phase;
+create table phase (
+    phase_id SERIAL PRIMARY KEY,
+    phase varchar(255),
+    unique (phase)
+);
+
 drop table if exists study;
 create table study (
     study_id SERIAL PRIMARY KEY,
+    phase_id INT NOT NULL,
     nct_id text,
     org_study_id text,
     brief_title text,
@@ -13,7 +21,6 @@ create table study (
     overall_status text,
     last_known_status text,
     why_stopped text,
-    phase text,
     study_type text,
     has_expanded_access text,
     target_duration text,
@@ -36,7 +43,8 @@ create table study (
     last_update_submitted_qc date,
     last_update_posted date,
     primary_completion_date date,
-    text text
+    text text,
+    foreign key (phase_id) references phase (phase_id) on delete cascade
 );
 
 CREATE INDEX study_detailed_desc ON study USING GIN (to_tsvector('english', detailed_description));
@@ -45,7 +53,8 @@ CREATE INDEX study_text ON study USING GIN (to_tsvector('english', text));
 drop table if exists condition;
 create table condition (
     condition_id SERIAL PRIMARY KEY,
-    condition varchar(255)
+    condition varchar(255),
+    unique (condition)
 );
 
 drop table if exists study_to_condition;
@@ -60,25 +69,19 @@ create table study_to_condition (
 drop table if exists study_doc;
 create table study_doc (
     study_doc_id SERIAL PRIMARY KEY,
+    study_id INT NOT NULL,
     doc_id varchar(255),
     doc_type varchar(255),
     doc_url text,
-    doc_comment text
-);
-
-drop table if exists study_to_study_doc;
-create table study_to_study_doc (
-    study_to_study_doc_id SERIAL PRIMARY KEY,
-    study_id INT NOT NULL,
-    study_doc_id INT NOT NULL,
-    foreign key (study_id) references study (study_id) on delete cascade,
-    foreign key (study_doc_id) references study_doc (study_doc_id) on delete cascade
+    doc_comment text,
+    foreign key (study_id) references study (study_id) on delete cascade
 );
 
 drop table if exists intervention;
 create table intervention (
     intervention_id SERIAL PRIMARY KEY,
-    intervention varchar(255)
+    intervention varchar(255),
+    unique (intervention)
 );
 
 drop table if exists study_to_intervention;
@@ -93,7 +96,8 @@ create table study_to_intervention (
 drop table if exists sponsor;
 create table sponsor (
     sponsor_id SERIAL PRIMARY KEY,
-    sponsor varchar(255)
+    sponsor varchar(255),
+    unique (sponsor)
 );
 
 drop table if exists study_to_sponsor;

@@ -54,11 +54,33 @@ class ConditionDropDown(BaseModel):
     num_studies: int
 
 
+class Phase(BaseModel):
+    phase_id: int
+    phase: str
+    num_studies: int
+
+
 class StudySearchResult(BaseModel):
     study_id: int
     nct_id: str
     title: str
     detailed_description: str
+
+
+class StudyDoc(BaseModel):
+    study_doc_id: int
+    doc_id: str
+    doc_type: str
+    doc_url: str
+    doc_comment: str
+
+
+class StudyOutcome(BaseModel):
+    study_outcome_id: int
+    outcome_type: str
+    measure: str
+    time_frame: str
+    description: str
 
 
 class StudySponsor(BaseModel):
@@ -79,6 +101,8 @@ class StudyIntervention(BaseModel):
 class StudyDetail(BaseModel):
     study_id: int
     nct_id: str
+    phase_id: int
+    phase: str
     official_title: str
     brief_title: str
     detailed_description: str
@@ -90,7 +114,6 @@ class StudyDetail(BaseModel):
     overall_status: str
     last_known_status: str
     why_stopped: str
-    phase: str
     study_type: str
     has_expanded_access: str
     target_duration: str
@@ -116,6 +139,8 @@ class StudyDetail(BaseModel):
     sponsors: List[StudySponsor]
     conditions: List[StudyCondition]
     interventions: List[StudyIntervention]
+    study_outcomes: List[StudyOutcome]
+    study_docs: List[StudyDoc]
 
 
 class Sponsor(BaseModel):
@@ -191,36 +216,29 @@ def download(study_ids: str) -> List[StudySearchResult]:
 def search(text: Optional[str] = '',
            conditions: Optional[str] = '',
            sponsors: Optional[str] = '',
-           detailed_desc: Optional[str] = '',
-           download: int = 0) -> List[StudySearchResult]:
+           phases: Optional[str] = '') -> List[StudySearchResult]:
     """ Search """
 
     flds = ['study_id', 'nct_id', 'brief_title', 'detailed_description']
-    # proj = {fld: 1 for fld in flds}
-    # qry = {}
-
     where = []
 
     if text:
-        # qry['$text'] = {'$search': text}
         where.append({
             'table':
             '',
             'where': ['s.text @@ to_tsquery({})'.format(make_bool(text))]
         })
 
-    if detailed_desc:
+    if phases:
         where.append({
             'table':
             '',
             'where': [
-                's.detailed_description @@ to_tsquery({})'.format(
-                    make_bool(detailed_desc))
+                's.phase_id in ({})'.format(phases)
             ]
         })
 
     if conditions:
-        # qry['conditions'] = {'$in': conditions.split('::')}
         where.append({
             'table':
             'study_to_condition s2c',
@@ -240,7 +258,6 @@ def search(text: Optional[str] = '',
             ]
         })
 
-    # res = mongo_db['ct'].find(qry, proj) if qry else []
 
     if not where:
         return []
@@ -252,9 +269,10 @@ def search(text: Optional[str] = '',
     sql = """
         select s.study_id, s.nct_id, s.brief_title, s.detailed_description
         from   {}
-        where  s.study_id is not null
+        where  s.nct_id != ''
         and {}
     """.format(table_names, where)
+
     # print(sql)
 
     res = []
@@ -332,27 +350,48 @@ def study(nct_id: str) -> StudyDetail:
                 ct.StudyToIntervention.study_id == study.study_id)
         ]
 
+        study_docs = [
+            StudyDoc(study_doc_id=doc.study_doc_id,
+                     doc_id=doc.doc_id,
+                     doc_type=doc.doc_type,
+                     doc_url=doc.doc_url,
+                     doc_comment=doc.doc_comment)
+            for doc in ct.StudyDoc.select().where(
+                ct.StudyDoc.study_id == study.study_id)
+        ]
+
+        study_outcomes = [
+            StudyOutcome(study_outcome_id=o.study_outcome_id,
+                         outcome_type=o.outcome_type,
+                         measure=o.measure,
+                         time_frame=o.time_frame,
+                         description=o.description)
+            for o in ct.StudyOutcome.select().where(
+                ct.StudyOutcome.study_id == study.study_id)
+        ]
+
         return StudyDetail(
             study_id=study.study_id,
             nct_id=study.nct_id,
-            official_title=study.official_title,
-            brief_title=study.brief_title,
-            detailed_description=study.detailed_description,
-            org_study_id=study.org_study_id,
-            acronym=study.acronym,
-            source=study.source,
-            rank=study.rank,
-            brief_summary=study.brief_summary,
-            overall_status=study.overall_status,
-            last_known_status=study.last_known_status,
-            why_stopped=study.why_stopped,
-            phase=study.phase,
+            official_title=study.official_title or '',
+            brief_title=study.brief_title or '',
+            detailed_description=study.detailed_description or '',
+            org_study_id=study.org_study_id or '',
+            acronym=study.acronym or '',
+            source=study.source or '',
+            rank=study.rank or '',
+            brief_summary=study.brief_summary or '',
+            overall_status=study.overall_status or '',
+            last_known_status=study.last_known_status or '',
+            why_stopped=study.why_stopped or '',
+            phase_id=study.phase_id,
+            phase=study.phase.phase,
             study_type=study.study_type,
             has_expanded_access=study.has_expanded_access,
             target_duration=study.target_duration,
             biospec_retention=study.biospec_retention,
             biospec_description=study.biospec_description,
-            keywords=study.keywords,
+            keywords=study.keywords or '',
             start_date=str(study.start_date) or '',
             completion_date=str(study.completion_date) or '',
             verification_date=str(study.verification_date) or '',
@@ -374,7 +413,9 @@ def study(nct_id: str) -> StudyDetail:
             primary_completion_date=str(study.primary_completion_date) or '',
             sponsors=sponsors,
             conditions=conditions,
-            interventions=interventions)
+            interventions=interventions,
+            study_outcomes=study_outcomes,
+            study_docs=study_docs)
 
 
 # --------------------------------------------------
@@ -423,3 +464,25 @@ def sponsors() -> List[Sponsor]:
     cur.close()
 
     return conditions
+
+
+# --------------------------------------------------
+@app.get('/phases', response_model=List[Phase])
+def phases() -> List[Phase]:
+    """ Phases """
+
+    sql = """
+        select   p.phase_id, p.phase, count(s.study_id) as num_studies
+        from     phase p, study s
+        where    p.phase_id=s.phase_id
+        group by 1, 2
+        order by 2
+    """
+
+    cur = get_cur()
+    cur.execute(sql)
+    res = cur.fetchall()
+    phases = list(map(lambda r: Phase(**dict(r)), res))
+    cur.close()
+
+    return phases

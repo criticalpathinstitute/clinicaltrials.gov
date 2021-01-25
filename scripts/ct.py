@@ -10,21 +10,28 @@ class BaseModel(Model):
         database = database
 
 class Condition(BaseModel):
-    condition = CharField(null=True)
+    condition = CharField(null=True, unique=True)
     condition_id = AutoField()
 
     class Meta:
         table_name = 'condition'
 
 class Intervention(BaseModel):
-    intervention = CharField(null=True)
+    intervention = CharField(null=True, unique=True)
     intervention_id = AutoField()
 
     class Meta:
         table_name = 'intervention'
 
+class Phase(BaseModel):
+    phase = CharField(null=True, unique=True)
+    phase_id = AutoField()
+
+    class Meta:
+        table_name = 'phase'
+
 class Sponsor(BaseModel):
-    sponsor = CharField(null=True)
+    sponsor = CharField(null=True, unique=True)
     sponsor_id = AutoField()
 
     class Meta:
@@ -42,6 +49,7 @@ class Study(BaseModel):
     disposition_first_submitted = DateField(null=True)
     disposition_first_submitted_qc = DateField(null=True)
     has_expanded_access = TextField(null=True)
+    keywords = TextField(null=True)
     last_known_status = TextField(null=True)
     last_update_posted = DateField(null=True)
     last_update_submitted = DateField(null=True)
@@ -50,7 +58,7 @@ class Study(BaseModel):
     official_title = TextField(null=True)
     org_study_id = TextField(null=True)
     overall_status = TextField(null=True)
-    phase = TextField(null=True)
+    phase = ForeignKeyField(column_name='phase_id', field='phase_id', model=Phase)
     primary_completion_date = DateField(null=True)
     rank = TextField(null=True)
     results_first_posted = DateField(null=True)
@@ -76,11 +84,12 @@ class Study(BaseModel):
         )
 
 class StudyDoc(BaseModel):
-    doc_comment = CharField(null=True)
+    doc_comment = TextField(null=True)
     doc_id = CharField(null=True)
     doc_type = CharField(null=True)
-    doc_url = CharField(null=True)
+    doc_url = TextField(null=True)
     study_doc_id = AutoField()
+    study = ForeignKeyField(column_name='study_id', field='study_id', model=Study)
 
     class Meta:
         table_name = 'study_doc'
@@ -119,12 +128,4 @@ class StudyToSponsor(BaseModel):
 
     class Meta:
         table_name = 'study_to_sponsor'
-
-class StudyToStudyDoc(BaseModel):
-    study_doc = ForeignKeyField(column_name='study_doc_id', field='study_doc_id', model=StudyDoc)
-    study = ForeignKeyField(column_name='study_id', field='study_id', model=Study)
-    study_to_study_doc_id = AutoField()
-
-    class Meta:
-        table_name = 'study_to_study_doc'
 

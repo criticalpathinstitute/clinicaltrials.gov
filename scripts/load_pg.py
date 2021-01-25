@@ -10,12 +10,13 @@ import dateparser
 import datetime as dt
 import json
 import os
+import signal
 import sys
 from pathlib import Path
 from rich.progress import track
 from pprint import pprint
 from ct import Study, Condition, StudyToCondition, StudyToSponsor, Sponsor, \
-    Intervention, StudyToIntervention, StudyDoc, StudyToStudyDoc, StudyOutcome
+    Intervention, StudyToIntervention, StudyDoc, StudyOutcome, Phase
 from typing import List, NamedTuple, TextIO
 
 
@@ -66,9 +67,23 @@ def main() -> None:
 
     args = get_args()
 
+    def handler(signum, frame):
+        print('Bye')
+        sys.exit()
+
+    signal.signal(signal.SIGINT, handler)
+
     for file in track(args.files, description="Processing..."):
         data = json.loads(open(file).read())
-        study, _ = Study.get_or_create(nct_id=data['nct_id'])
+
+        phase, _ = Phase.get_or_create(phase=data['phase'] or 'N/A')
+
+        study = None
+        if studies := Study.select().where(Study.nct_id == data['nct_id']):
+            study = studies[0]
+        else:
+            study, _ = Study.get_or_create(nct_id=data['nct_id'],
+                                           phase_id=phase.phase_id)
 
         study.acronym = data['acronym']
         study.biospec_description = data['biospec_description']
@@ -81,7 +96,7 @@ def main() -> None:
         study.official_title = data['official_title']
         study.org_study_id = data['org_study_id']
         study.overall_status = data['overall_status']
-        study.phase = data['phase']
+        study.phase_id = phase.phase_id
         study.rank = data['rank']
         study.source = data['source']
         study.study_type = data['study_type']
@@ -128,17 +143,18 @@ def main() -> None:
                                                   sponsor_id=spon.sponsor_id)
 
         for doc in data.get('study_docs'):
-            study_doc, _ = StudyDoc.get_or_create(doc_id=doc['doc_id'])
+            study_doc, _ = StudyDoc.get_or_create(study_id=study.study_id,
+                                                  doc_id=doc['doc_id'])
+
             study_doc.doc_type = doc['doc_type']
             study_doc.doc_url = doc['doc_url']
             study_doc.doc_comment = doc['doc_comment']
             study_doc.save()
-            s2doc, _ = StudyToStudyDoc.get_or_create(
-                study_id=study.study_id, study_doc_id=study_doc.study_doc_id)
 
         outcome_types = [
             'primary_outcomes', 'secondary_outcomes', 'other_outcomes'
         ]
+
         for outcome_type in outcome_types:
             for outcome in data.get(outcome_type, []):
                 study_outcome, _ = StudyOutcome.get_or_create(
