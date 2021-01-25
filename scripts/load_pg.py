@@ -9,7 +9,9 @@ import argparse
 import dateparser
 import datetime as dt
 import json
+import os
 import sys
+from pathlib import Path
 from rich.progress import track
 from pprint import pprint
 from ct import Study, Condition, StudyToCondition, StudyToSponsor, Sponsor, \
@@ -30,13 +32,30 @@ def get_args() -> Args:
         description='Rock the Casbah',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument('file',
+    parser.add_argument('-d',
+                        '--dir',
+                        help='Input JSON directory',
+                        metavar='DIR',
+                        type=str,
+                        nargs='+')
+
+    parser.add_argument('-f',
+                        '--file',
                         help='Input JSON file(s)',
                         metavar='FILE',
                         type=str,
                         nargs='+')
 
     args = parser.parse_args()
+
+    if args.dir and not args.file:
+        filenames = []
+        for dirname in args.dir:
+            if not os.path.isdir(dirname):
+                dirname = os.path.abspath(dirname)
+            filenames.extend(list(Path(dirname).rglob('*.json')))
+
+        args.file = filenames
 
     return Args(args.file)
 

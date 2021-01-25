@@ -316,10 +316,9 @@ def main() -> None:
         out_fh.write(json.dumps(typedload.dump(study), indent=4) + '\n')
         out_fh.close()
         num_written += 1
-        # break
 
     if errors:
-        print('\n'.join(['ERRORS:'] + errors))
+        print('\n'.join([f'{len(errors)} ERRORS:'] + errors), file=sys.stderr)
 
     print(f'Done, wrote {num_written:,} to "{args.outdir}".')
 
@@ -661,9 +660,11 @@ def get_str_list(xml, fld) -> List[str]:
 def restructure(xml: str, all_text: str) -> Study:
     """ Restructure XML """
 
+    id_info = xml.get('id_info', {})
+
     return Study(
-        nct_id=xml['id_info']['nct_id'],
-        org_study_id=xml['id_info']['org_study_id'],
+        nct_id=id_info.get('nct_id', ''),
+        org_study_id=id_info.get('org_study_id', ''),
         brief_title=xml.get('brief_title', ''),
         official_title=xml.get('official_title', ''),
         acronym=xml.get('acronym', ''),
