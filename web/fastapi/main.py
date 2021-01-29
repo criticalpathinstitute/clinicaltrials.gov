@@ -54,6 +54,12 @@ class ConditionDropDown(BaseModel):
     num_studies: int
 
 
+class Phase(BaseModel):
+    phase_id: int
+    phase: str
+    num_studies: int
+
+
 class StudySearchResult(BaseModel):
     study_id: int
     nct_id: str
@@ -61,20 +67,42 @@ class StudySearchResult(BaseModel):
     detailed_description: str
 
 
+class StudyDoc(BaseModel):
+    study_doc_id: int
+    doc_id: str
+    doc_type: str
+    doc_url: str
+    doc_comment: str
+
+
+class StudyOutcome(BaseModel):
+    study_outcome_id: int
+    outcome_type: str
+    measure: str
+    time_frame: str
+    description: str
+
+
 class StudySponsor(BaseModel):
     sponsor_id: int
     sponsor_name: str
+
 
 class StudyCondition(BaseModel):
     condition_id: int
     condition: str
 
+
 class StudyIntervention(BaseModel):
     intervention_id: int
     intervention: str
 
+
 class StudyDetail(BaseModel):
+    study_id: int
     nct_id: str
+    phase_id: int
+    phase: str
     official_title: str
     brief_title: str
     detailed_description: str
@@ -86,12 +114,12 @@ class StudyDetail(BaseModel):
     overall_status: str
     last_known_status: str
     why_stopped: str
-    phase: str
     study_type: str
     has_expanded_access: str
     target_duration: str
     biospec_retention: str
     biospec_description: str
+    keywords: str
     start_date: str
     completion_date: str
     verification_date: str
@@ -111,6 +139,8 @@ class StudyDetail(BaseModel):
     sponsors: List[StudySponsor]
     conditions: List[StudyCondition]
     interventions: List[StudyIntervention]
+    study_outcomes: List[StudyOutcome]
+    study_docs: List[StudyDoc]
 
 
 class Sponsor(BaseModel):
@@ -137,74 +167,15 @@ def get_cur():
 
 
 # --------------------------------------------------
-@app.get('/search', response_model=List[StudySearchResult])
-def search(text: Optional[str] = '',
-           conditions: Optional[str] = '',
-           sponsors: Optional[str] = '',
-           detailed_desc: Optional[str] = '',
-           download: int = 0):
-    """ Search """
+@app.get('/download', response_model=List[StudySearchResult])
+def download(study_ids: str) -> List[StudySearchResult]:
+    """ Download """
 
-    flds = ['study_id', 'nct_id', 'brief_title', 'detailed_description']
-    # proj = {fld: 1 for fld in flds}
-    # qry = {}
-
-    where = []
-
-    if text:
-        # qry['$text'] = {'$search': text}
-        where.append({
-            'table':
-            '',
-            'where': ['s.text @@ to_tsquery({})'.format(make_bool(text))]
-        })
-
-    if detailed_desc:
-        where.append({
-            'table':
-            '',
-            'where': [
-                's.detailed_description @@ to_tsquery({})'.format(
-                    make_bool(detailed_desc))
-            ]
-        })
-
-    if conditions:
-        # qry['conditions'] = {'$in': conditions.split('::')}
-        where.append({
-            'table':
-            'study_to_condition s2c',
-            'where': [
-                's.study_id=s2c.study_id',
-                's2c.condition_id in ({})'.format(conditions)
-            ]
-        })
-
-    if sponsors:
-        where.append({
-            'table':
-            'study_to_sponsor s2p',
-            'where': [
-                's.study_id=s2p.study_id',
-                's2p.sponsor_id in ({})'.format(sponsors)
-            ]
-        })
-
-    # res = mongo_db['ct'].find(qry, proj) if qry else []
-
-    if not where:
-        return []
-
-    table_names = ', '.join(
-        filter(None, ['study s'] + list(map(lambda x: x['table'], where))))
-    where = '\nand '.join(chain.from_iterable(map(lambda x: x['where'],
-                                                  where)))
     sql = """
         select s.study_id, s.nct_id, s.brief_title, s.detailed_description
-        from   {}
-        where  s.study_id is not null
-        and {}
-    """.format(table_names, where)
+        from   study s
+        where  s.study_id in ({})
+    """.format(study_ids)
     # print(sql)
 
     res = []
@@ -226,21 +197,105 @@ def search(text: Optional[str] = '',
             title=rec['brief_title'],
             detailed_description=rec['detailed_description'])
 
-    if download:
-        stream = io.StringIO()
-        writer = csv.DictWriter(stream, fieldnames=flds, delimiter=',')
-        writer.writeheader()
-        for row in res:
-            writer.writerow({f: row[f] for f in flds})
+    flds = ['study_id', 'nct_id', 'brief_title', 'detailed_description']
+    stream = io.StringIO()
+    writer = csv.DictWriter(stream, fieldnames=flds, delimiter=',')
+    writer.writeheader()
+    for row in res:
+        writer.writerow({f: row[f] for f in flds})
 
-        response = StreamingResponse(iter([stream.getvalue()]),
-                                     media_type="text/csv")
-        response.headers[
-            "Content-Disposition"] = "attachment; filename=download.csv"
-        return response
-    else:
-        return list(map(f, res))
-        # return list(map(lambda r: StudySearchResult(**dict(r)), res))
+    response = StreamingResponse(iter([stream.getvalue()]),
+                                 media_type="text/csv")
+    response.headers[
+        "Content-Disposition"] = "attachment; filename=download.csv"
+    return response
+
+
+# --------------------------------------------------
+@app.get('/search', response_model=List[StudySearchResult])
+def search(text: Optional[str] = '',
+           conditions: Optional[str] = '',
+           sponsors: Optional[str] = '',
+           phases: Optional[str] = '') -> List[StudySearchResult]:
+    """ Search """
+
+    flds = ['study_id', 'nct_id', 'brief_title', 'detailed_description']
+    where = []
+
+    if text:
+        where.append({
+            'table':
+            '',
+            'where': ['s.text @@ to_tsquery({})'.format(make_bool(text))]
+        })
+
+    if phases:
+        where.append({
+            'table':
+            '',
+            'where': [
+                's.phase_id in ({})'.format(phases)
+            ]
+        })
+
+    if conditions:
+        where.append({
+            'table':
+            'study_to_condition s2c',
+            'where': [
+                's.study_id=s2c.study_id',
+                's2c.condition_id in ({})'.format(conditions)
+            ]
+        })
+
+    if sponsors:
+        where.append({
+            'table':
+            'study_to_sponsor s2p',
+            'where': [
+                's.study_id=s2p.study_id',
+                's2p.sponsor_id in ({})'.format(sponsors)
+            ]
+        })
+
+
+    if not where:
+        return []
+
+    table_names = ', '.join(
+        filter(None, ['study s'] + list(map(lambda x: x['table'], where))))
+    where = '\nand '.join(chain.from_iterable(map(lambda x: x['where'],
+                                                  where)))
+    sql = """
+        select s.study_id, s.nct_id, s.brief_title, s.detailed_description
+        from   {}
+        where  s.nct_id != ''
+        and {}
+    """.format(table_names, where)
+
+    # print(sql)
+
+    res = []
+    try:
+        cur = get_cur()
+        cur.execute(sql)
+        res = cur.fetchall()
+        cur.close()
+    except:
+        dbh.rollback()
+
+    if not res:
+        return []
+
+    def f(rec):
+        return StudySearchResult(
+            study_id=rec['study_id'],
+            nct_id=rec['nct_id'],
+            title=rec['brief_title'],
+            detailed_description=rec['detailed_description'])
+
+    return list(map(f, res))
+    # return list(map(lambda r: StudySearchResult(**dict(r)), res))
 
 
 # --------------------------------------------------
@@ -251,28 +306,6 @@ def make_bool(s: str):
     s = re.sub('\s+and\s+', ' & ', s, re.I)
     s = re.sub('\s+or\s+', ' | ', s, re.I)
     return f"'{s}'"
-
-
-# --------------------------------------------------
-@app.get('/quick_search/{term}', response_model=List[StudySearchResult])
-def quick_search(term: str):
-    """ Search text for keyword """
-    def f(rec):
-        return StudySearchResult(nct_id=rec['nct_id'],
-                                 title=rec['brief_title'])
-
-    cur = get_cur()
-    sql = f"""
-        select nct_id, brief_title as title
-        from   study
-        where  text @@ to_tsquery('{term}');
-    """
-    cur.execute(sql)
-    res = cur.fetchall()
-    studies = list(map(lambda r: StudySearchResult(**dict(r)), res))
-    cur.close()
-
-    return studies
 
 
 # --------------------------------------------------
@@ -305,37 +338,60 @@ def study(nct_id: str) -> StudyDetail:
 
         conditions = [
             StudyCondition(condition_id=c.condition_id,
-                         condition=c.condition.condition)
+                           condition=c.condition.condition)
             for c in ct.StudyToCondition.select().where(
                 ct.StudyToCondition.study_id == study.study_id)
         ]
 
         interventions = [
             StudyIntervention(intervention_id=c.intervention_id,
-                         intervention=c.intervention.intervention)
+                              intervention=c.intervention.intervention)
             for c in ct.StudyToIntervention.select().where(
                 ct.StudyToIntervention.study_id == study.study_id)
         ]
 
+        study_docs = [
+            StudyDoc(study_doc_id=doc.study_doc_id,
+                     doc_id=doc.doc_id,
+                     doc_type=doc.doc_type,
+                     doc_url=doc.doc_url,
+                     doc_comment=doc.doc_comment)
+            for doc in ct.StudyDoc.select().where(
+                ct.StudyDoc.study_id == study.study_id)
+        ]
+
+        study_outcomes = [
+            StudyOutcome(study_outcome_id=o.study_outcome_id,
+                         outcome_type=o.outcome_type,
+                         measure=o.measure,
+                         time_frame=o.time_frame,
+                         description=o.description)
+            for o in ct.StudyOutcome.select().where(
+                ct.StudyOutcome.study_id == study.study_id)
+        ]
+
         return StudyDetail(
+            study_id=study.study_id,
             nct_id=study.nct_id,
-            official_title=study.official_title,
-            brief_title=study.brief_title,
-            detailed_description=study.detailed_description,
-            org_study_id=study.org_study_id,
-            acronym=study.acronym,
-            source=study.source,
-            rank=study.rank,
-            brief_summary=study.brief_summary,
-            overall_status=study.overall_status,
-            last_known_status=study.last_known_status,
-            why_stopped=study.why_stopped,
-            phase=study.phase,
+            official_title=study.official_title or '',
+            brief_title=study.brief_title or '',
+            detailed_description=study.detailed_description or '',
+            org_study_id=study.org_study_id or '',
+            acronym=study.acronym or '',
+            source=study.source or '',
+            rank=study.rank or '',
+            brief_summary=study.brief_summary or '',
+            overall_status=study.overall_status or '',
+            last_known_status=study.last_known_status or '',
+            why_stopped=study.why_stopped or '',
+            phase_id=study.phase_id,
+            phase=study.phase.phase,
             study_type=study.study_type,
             has_expanded_access=study.has_expanded_access,
             target_duration=study.target_duration,
             biospec_retention=study.biospec_retention,
             biospec_description=study.biospec_description,
+            keywords=study.keywords or '',
             start_date=str(study.start_date) or '',
             completion_date=str(study.completion_date) or '',
             verification_date=str(study.verification_date) or '',
@@ -357,7 +413,9 @@ def study(nct_id: str) -> StudyDetail:
             primary_completion_date=str(study.primary_completion_date) or '',
             sponsors=sponsors,
             conditions=conditions,
-            interventions=interventions)
+            interventions=interventions,
+            study_outcomes=study_outcomes,
+            study_docs=study_docs)
 
 
 # --------------------------------------------------
@@ -406,3 +464,25 @@ def sponsors() -> List[Sponsor]:
     cur.close()
 
     return conditions
+
+
+# --------------------------------------------------
+@app.get('/phases', response_model=List[Phase])
+def phases() -> List[Phase]:
+    """ Phases """
+
+    sql = """
+        select   p.phase_id, p.phase, count(s.study_id) as num_studies
+        from     phase p, study s
+        where    p.phase_id=s.phase_id
+        group by 1, 2
+        order by 2
+    """
+
+    cur = get_cur()
+    cur.execute(sql)
+    res = cur.fetchall()
+    phases = list(map(lambda r: Phase(**dict(r)), res))
+    cur.close()
+
+    return phases

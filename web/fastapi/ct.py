@@ -1,6 +1,5 @@
 from peewee import *
 
-# database = PostgresqlDatabase('ct')
 database = PostgresqlDatabase('ct', user='postgres', host='127.0.0.1')
 
 class UnknownField(object):

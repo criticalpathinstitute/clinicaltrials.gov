@@ -19,19 +19,19 @@ view navConfig navbarState content =
                 |> Navbar.withAnimation
                 |> Navbar.brand
                     [ Route.href Route.Home ]
-                    [ img [ src "./assets/images/logo.png" ] [] ]
+                    [ img
+                        [ src "./assets/images/logo.png"
+                        , class "d-inline-block align-top"
+                        ]
+                        []
+                    ]
                 |> Navbar.view navbarState
     in
     { title = "Clinical Trials Portal"
     , body =
         [ Grid.container []
-            [ Grid.row []
-                [ Grid.col
-                    []
-                    [ nav
-                    , content
-                    ]
-                ]
+            [ nav
+            , content
             ]
         ]
     }
