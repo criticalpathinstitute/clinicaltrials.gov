@@ -875,6 +875,9 @@ doSearch model =
 
         searchUrl =
             apiServer ++ "/search/" ++ queryParams
+
+        _ =
+            Debug.log "url" searchUrl
     in
     Http.get
         { url = searchUrl

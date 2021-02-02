@@ -273,7 +273,7 @@ def search(text: Optional[str] = '',
         and {}
     """.format(table_names, where)
 
-    # print(sql)
+    print(sql)
 
     res = []
     try:
