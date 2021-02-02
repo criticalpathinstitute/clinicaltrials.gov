@@ -31,4 +31,4 @@ mongo:
 	./scripts/mongoimport.sh
 
 pgload:
-	./scripts/load_pg.py -d json
+	./scripts/load_pg.py -d json -p loaded.txt
