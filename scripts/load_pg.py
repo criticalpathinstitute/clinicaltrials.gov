@@ -15,7 +15,6 @@ import sys
 import shutil
 import tempfile
 from pathlib import Path
-from rich.progress import track
 from pprint import pprint
 from ct import Study, Condition, StudyToCondition, StudyToSponsor, Sponsor, \
     Intervention, StudyToIntervention, StudyDoc, StudyOutcome, Phase
@@ -83,16 +82,26 @@ def main() -> None:
 
     progress_fh = tempfile.NamedTemporaryFile(delete=False, mode='wt')
 
+    def cleanup():
+        progress_fh.close()
+        if args.progress:
+            shutil.move(progress_fh.name, args.progress)
+
     def handler(signum, frame):
+        cleanup()
         print('Bye')
         sys.exit()
 
     signal.signal(signal.SIGINT, handler)
 
-    for file in track(args.files, description="Processing..."):
+    print(f'Processing {len(args.files):,} files')
+
+    for i, file in enumerate(args.files, start=1):
         basename = os.path.basename(file)
+        print(f'{i:5}: Processing "{basename}"')
+
         if basename in done:
-            print(f'Skipping "{basename}"')
+            print('Skipping')
             continue
 
         data = json.loads(open(file).read())
@@ -197,10 +206,7 @@ def main() -> None:
         progress_fh.write(basename + '\n')
         progress_fh.flush()
 
-    progress_fh.close()
-    if args.progress:
-        shutil.move(progress_fh.name, args.progress)
-
+    cleanup()
     print('Done.')
 
 
