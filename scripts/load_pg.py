@@ -12,6 +12,8 @@ import json
 import os
 import signal
 import sys
+import shutil
+import tempfile
 from pathlib import Path
 from rich.progress import track
 from pprint import pprint
@@ -75,8 +77,11 @@ def main() -> None:
     args = get_args()
 
     done = set()
+
     if args.progress and os.path.isfile(args.progress):
         done = set([line.rstrip() for line in open(args.progress)])
+
+    progress_fh = tempfile.NamedTemporaryFile(delete=False, mode='wt')
 
     def handler(signum, frame):
         print('Bye')
@@ -84,13 +89,16 @@ def main() -> None:
 
     signal.signal(signal.SIGINT, handler)
 
-    processed = []
     i = 0
     for file in track(args.files, description="Processing..."):
         basename = os.path.basename(file)
         if basename in done:
             print(f'Skipping "{basename}"')
             continue
+
+        i += 1
+        if i == 3:
+            break
 
         data = json.loads(open(file).read())
 
@@ -190,11 +198,13 @@ def main() -> None:
                     study_id=study.study_id,
                     intervention_id=int_.intervention_id)
 
-        processed.append(basename)
+        # Record progress
+        progress_fh.write(basename + '\n')
+        progress_fh.flush()
 
+    progress_fh.close()
     if args.progress:
-        print('\n'.join(processed), file=open(args.progress, 'wt'))
-        print(f'Writing {len(processed):,} to "{args.progress}"')
+        shutil.move(progress_fh.name, args.progress)
 
     print('Done.')
 
