@@ -78,7 +78,6 @@ def main() -> None:
     if args.progress and os.path.isfile(args.progress):
         done = set([line.rstrip() for line in open(args.progress)])
 
-    print('done', done)
     def handler(signum, frame):
         print('Bye')
         sys.exit()
@@ -92,10 +91,6 @@ def main() -> None:
         if basename in done:
             print(f'Skipping "{basename}"')
             continue
-
-        i += 1
-        if i > 3:
-            break
 
         data = json.loads(open(file).read())
 
