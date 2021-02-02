@@ -17,12 +17,13 @@ from rich.progress import track
 from pprint import pprint
 from ct import Study, Condition, StudyToCondition, StudyToSponsor, Sponsor, \
     Intervention, StudyToIntervention, StudyDoc, StudyOutcome, Phase
-from typing import List, NamedTuple, TextIO
+from typing import Optional, List, NamedTuple, TextIO
 
 
 class Args(NamedTuple):
     """ Command-line arguments """
     files: List[str]
+    progress: Optional[TextIO]
 
 
 # --------------------------------------------------
@@ -47,6 +48,12 @@ def get_args() -> Args:
                         type=str,
                         nargs='+')
 
+    parser.add_argument('-p',
+                        '--progress',
+                        help='File to record progress/resume',
+                        metavar='FILE',
+                        type=str)
+
     args = parser.parse_args()
 
     if args.dir and not args.file:
@@ -58,7 +65,7 @@ def get_args() -> Args:
 
         args.file = filenames
 
-    return Args(args.file)
+    return Args(args.file, args.progress)
 
 
 # --------------------------------------------------
@@ -67,13 +74,29 @@ def main() -> None:
 
     args = get_args()
 
+    done = set()
+    if args.progress and os.path.isfile(args.progress):
+        done = set([line.rstrip() for line in open(args.progress)])
+
+    print('done', done)
     def handler(signum, frame):
         print('Bye')
         sys.exit()
 
     signal.signal(signal.SIGINT, handler)
 
+    processed = []
+    i = 0
     for file in track(args.files, description="Processing..."):
+        basename = os.path.basename(file)
+        if basename in done:
+            print(f'Skipping "{basename}"')
+            continue
+
+        i += 1
+        if i > 3:
+            break
+
         data = json.loads(open(file).read())
 
         phase, _ = Phase.get_or_create(phase=data['phase'] or 'N/A')
@@ -171,6 +194,12 @@ def main() -> None:
                 i2c, _ = StudyToIntervention.get_or_create(
                     study_id=study.study_id,
                     intervention_id=int_.intervention_id)
+
+        processed.append(basename)
+
+    if args.progress:
+        print('\n'.join(processed), file=open(args.progress, 'wt'))
+        print(f'Writing {len(processed):,} to "{args.progress}"')
 
     print('Done.')
 
