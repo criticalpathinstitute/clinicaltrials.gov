@@ -89,16 +89,11 @@ def main() -> None:
 
     signal.signal(signal.SIGINT, handler)
 
-    i = 0
     for file in track(args.files, description="Processing..."):
         basename = os.path.basename(file)
         if basename in done:
             print(f'Skipping "{basename}"')
             continue
-
-        i += 1
-        if i == 3:
-            break
 
         data = json.loads(open(file).read())
 

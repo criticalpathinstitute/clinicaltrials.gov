@@ -176,7 +176,7 @@ def download(study_ids: str) -> List[StudySearchResult]:
         from   study s
         where  s.study_id in ({})
     """.format(study_ids)
-    print(sql)
+    # print(sql)
 
     res = []
     try:

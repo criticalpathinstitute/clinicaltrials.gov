@@ -9,7 +9,7 @@ import argparse
 import dateparser
 import datetime as dt
 import json
-import namedtupled
+# import namedtupled
 import os
 import re
 import sys
