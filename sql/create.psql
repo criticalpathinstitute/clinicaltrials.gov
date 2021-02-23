@@ -22,14 +22,14 @@ create table status (
 drop table if exists study;
 create table study (
     study_id SERIAL PRIMARY KEY,
-    phase_id INT NOT NULL,
     study_type_id INT NOT NULL,
+    phase_id INT NOT NULL,
     overall_status_id INT NOT NULL,
     last_known_status_id INT NOT NULL,
     nct_id varchar(255) NOT NULL,
     brief_title text,
-    org_study_id text,
     official_title text,
+    org_study_id text,
     acronym text,
     source text,
     rank text,
@@ -59,8 +59,9 @@ create table study (
     /*last_update_posted date,*/
     /*primary_completion_date date,*/
     all_text text,
+    record_last_updated timestamp DEFAULT CURRENT_TIMESTAMP,
     unique (nct_id),
-    foreign key (phase_id) references phase (phase_id) on delete cascade
+    foreign key (phase_id) references phase (phase_id) on delete cascade,
     foreign key (study_type_id) references study_type (study_type_id) on delete cascade,
     foreign key (overall_status_id) references status (status_id) on delete cascade,
     foreign key (last_known_status_id) references status (status_id) on delete cascade
