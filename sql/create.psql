@@ -1,60 +1,78 @@
 drop table if exists phase;
 create table phase (
     phase_id SERIAL PRIMARY KEY,
-    phase varchar(255),
-    unique (phase)
+    phase_name varchar(255) NOT NULL,
+    unique (phase_name)
+);
+
+drop table if exists study_type;
+create table study_type (
+    study_type_id SERIAL PRIMARY KEY,
+    study_type_name varchar(255) NOT NULL,
+    unique (study_type_name)
+);
+
+drop table if exists status;
+create table status (
+    status_id SERIAL PRIMARY KEY,
+    status_name varchar(255) NOT NULL,
+    unique (status_name)
 );
 
 drop table if exists study;
 create table study (
     study_id SERIAL PRIMARY KEY,
     phase_id INT NOT NULL,
-    nct_id text,
-    org_study_id text,
+    study_type_id INT NOT NULL,
+    overall_status_id INT NOT NULL,
+    last_known_status_id INT NOT NULL,
+    nct_id varchar(255) NOT NULL,
     brief_title text,
+    org_study_id text,
     official_title text,
     acronym text,
     source text,
     rank text,
     brief_summary text,
     detailed_description text,
-    overall_status text,
-    last_known_status text,
     why_stopped text,
-    study_type text,
     has_expanded_access text,
     target_duration text,
     biospec_retention text,
     biospec_description text,
     keywords text,
+    enrollment int,
     start_date date,
     completion_date date,
-    verification_date date,
-    study_first_submitted date,
-    study_first_submitted_qc date,
-    study_first_posted date,
-    results_first_submitted date,
-    results_first_submitted_qc date,
-    results_first_posted date,
-    disposition_first_submitted date,
-    disposition_first_submitted_qc date,
-    disposition_first_posted date,
-    last_update_submitted date,
-    last_update_submitted_qc date,
-    last_update_posted date,
-    primary_completion_date date,
-    text text,
+    /*verification_date date,*/
+    /*study_first_submitted date,*/
+    /*study_first_submitted_qc date,*/
+    /*study_first_posted date,*/
+    /*results_first_submitted date,*/
+    /*results_first_submitted_qc date,*/
+    /*results_first_posted date,*/
+    /*disposition_first_submitted date,*/
+    /*disposition_first_submitted_qc date,*/
+    /*disposition_first_posted date,*/
+    /*last_update_submitted date,*/
+    /*last_update_submitted_qc date,*/
+    /*last_update_posted date,*/
+    /*primary_completion_date date,*/
+    all_text text,
+    unique (nct_id),
     foreign key (phase_id) references phase (phase_id) on delete cascade
+    foreign key (study_type_id) references study_type (study_type_id) on delete cascade,
+    foreign key (overall_status_id) references status (status_id) on delete cascade,
+    foreign key (last_known_status_id) references status (status_id) on delete cascade
 );
 
-CREATE INDEX study_detailed_desc ON study USING GIN (to_tsvector('english', detailed_description));
-CREATE INDEX study_text ON study USING GIN (to_tsvector('english', text));
+CREATE INDEX study_text ON study USING GIN (to_tsvector('english', all_text));
 
 drop table if exists condition;
 create table condition (
     condition_id SERIAL PRIMARY KEY,
-    condition varchar(255),
-    unique (condition)
+    condition_name varchar(255) NOT NULL,
+    unique (condition_name)
 );
 
 drop table if exists study_to_condition;
@@ -80,8 +98,8 @@ create table study_doc (
 drop table if exists intervention;
 create table intervention (
     intervention_id SERIAL PRIMARY KEY,
-    intervention varchar(255),
-    unique (intervention)
+    intervention_name varchar(255) NOT NULL,
+    unique (intervention_name)
 );
 
 drop table if exists study_to_intervention;
@@ -96,8 +114,8 @@ create table study_to_intervention (
 drop table if exists sponsor;
 create table sponsor (
     sponsor_id SERIAL PRIMARY KEY,
-    sponsor varchar(255),
-    unique (sponsor)
+    sponsor_name varchar(255) NOT NULL,
+    unique (sponsor_name)
 );
 
 drop table if exists study_to_sponsor;
