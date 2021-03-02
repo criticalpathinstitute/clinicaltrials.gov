@@ -44,20 +44,6 @@ create table study (
     enrollment int,
     start_date date,
     completion_date date,
-    /*verification_date date,*/
-    /*study_first_submitted date,*/
-    /*study_first_submitted_qc date,*/
-    /*study_first_posted date,*/
-    /*results_first_submitted date,*/
-    /*results_first_submitted_qc date,*/
-    /*results_first_posted date,*/
-    /*disposition_first_submitted date,*/
-    /*disposition_first_submitted_qc date,*/
-    /*disposition_first_posted date,*/
-    /*last_update_submitted date,*/
-    /*last_update_submitted_qc date,*/
-    /*last_update_posted date,*/
-    /*primary_completion_date date,*/
     all_text text,
     record_last_updated timestamp DEFAULT CURRENT_TIMESTAMP,
     unique (nct_id),
@@ -132,8 +118,8 @@ drop table if exists study_outcome;
 create table study_outcome (
     study_outcome_id SERIAL PRIMARY KEY,
     study_id INT NOT NULL,
-    outcome_type varchar(255),
-    measure text,
+    outcome_type varchar(255) NOT NULL,
+    measure text NOT NULL,
     time_frame text,
     description text,
     foreign key (study_id) references study (study_id) on delete cascade

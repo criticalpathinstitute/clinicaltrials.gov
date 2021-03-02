@@ -1,7 +1,6 @@
 from peewee import *
 
 database = PostgresqlDatabase('ct')
-# database = PostgresqlDatabase('ct', user='postgres', host='127.0.0.1')
 
 class UnknownField(object):
     def __init__(self, *_, **__): pass
@@ -11,76 +10,77 @@ class BaseModel(Model):
         database = database
 
 class Condition(BaseModel):
-    condition = CharField(null=True, unique=True)
     condition_id = AutoField()
+    condition_name = CharField(unique=True)
 
     class Meta:
         table_name = 'condition'
 
 class Intervention(BaseModel):
-    intervention = CharField(null=True, unique=True)
     intervention_id = AutoField()
+    intervention_name = CharField(unique=True)
 
     class Meta:
         table_name = 'intervention'
 
 class Phase(BaseModel):
-    phase = CharField(null=True, unique=True)
     phase_id = AutoField()
+    phase_name = CharField(unique=True)
 
     class Meta:
         table_name = 'phase'
 
 class Sponsor(BaseModel):
-    sponsor = CharField(null=True, unique=True)
     sponsor_id = AutoField()
+    sponsor_name = CharField(unique=True)
 
     class Meta:
         table_name = 'sponsor'
 
+class Status(BaseModel):
+    status_id = AutoField()
+    status_name = CharField(unique=True)
+
+    class Meta:
+        table_name = 'status'
+
+class StudyType(BaseModel):
+    study_type_id = AutoField()
+    study_type_name = CharField(unique=True)
+
+    class Meta:
+        table_name = 'study_type'
+
 class Study(BaseModel):
     acronym = TextField(null=True)
+    all_text = TextField(null=True)
     biospec_description = TextField(null=True)
     biospec_retention = TextField(null=True)
     brief_summary = TextField(null=True)
     brief_title = TextField(null=True)
     completion_date = DateField(null=True)
     detailed_description = TextField(null=True)
-    disposition_first_posted = DateField(null=True)
-    disposition_first_submitted = DateField(null=True)
-    disposition_first_submitted_qc = DateField(null=True)
+    enrollment = IntegerField(null=True)
     has_expanded_access = TextField(null=True)
     keywords = TextField(null=True)
-    last_known_status = TextField(null=True)
-    last_update_posted = DateField(null=True)
-    last_update_submitted = DateField(null=True)
-    last_update_submitted_qc = DateField(null=True)
-    nct_id = TextField(null=True)
+    last_known_status = ForeignKeyField(column_name='last_known_status_id', field='status_id', model=Status)
+    nct_id = CharField(unique=True)
     official_title = TextField(null=True)
     org_study_id = TextField(null=True)
-    overall_status = TextField(null=True)
+    overall_status = ForeignKeyField(backref='status_overall_status_set', column_name='overall_status_id', field='status_id', model=Status)
     phase = ForeignKeyField(column_name='phase_id', field='phase_id', model=Phase)
-    primary_completion_date = DateField(null=True)
     rank = TextField(null=True)
-    results_first_posted = DateField(null=True)
-    results_first_submitted = DateField(null=True)
-    results_first_submitted_qc = DateField(null=True)
+    record_last_updated = DateTimeField(constraints=[SQL("DEFAULT CURRENT_TIMESTAMP")], null=True)
     source = TextField(null=True)
     start_date = DateField(null=True)
-    study_first_posted = DateField(null=True)
-    study_first_submitted = DateField(null=True)
-    study_first_submitted_qc = DateField(null=True)
     study_id = AutoField()
-    study_type = TextField(null=True)
+    study_type = ForeignKeyField(column_name='study_type_id', field='study_type_id', model=StudyType)
     target_duration = TextField(null=True)
-    text = TextField(null=True)
-    verification_date = DateField(null=True)
     why_stopped = TextField(null=True)
 
     class Meta:
         table_name = 'study'
         indexes = (
-            ((), False),
             ((), False),
         )
 
@@ -97,8 +97,8 @@ class StudyDoc(BaseModel):
 
 class StudyOutcome(BaseModel):
     description = TextField(null=True)
-    measure = TextField(null=True)
-    outcome_type = CharField(null=True)
+    measure = TextField()
+    outcome_type = CharField()
     study = ForeignKeyField(column_name='study_id', field='study_id', model=Study)
     study_outcome_id = AutoField()
     time_frame = TextField(null=True)
