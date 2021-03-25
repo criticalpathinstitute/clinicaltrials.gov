@@ -54,6 +54,11 @@ create table study (
 );
 
 CREATE INDEX study_text ON study USING GIN (to_tsvector('english', all_text));
+create index study_type_id on study (study_type_id);
+create index phase_id on study (phase_id);
+create index overall_status_id on study (overall_status_id);
+create index last_known_status_id on study (last_known_status_id);
+create index nct_id on study (nct_id);
 
 drop table if exists condition;
 create table condition (
@@ -61,6 +66,8 @@ create table condition (
     condition_name varchar(255) NOT NULL,
     unique (condition_name)
 );
+
+CREATE INDEX condition_name ON condition USING GIN (to_tsvector('english', condition_name));
 
 drop table if exists study_to_condition;
 create table study_to_condition (
@@ -104,6 +111,8 @@ create table sponsor (
     sponsor_name varchar(255) NOT NULL,
     unique (sponsor_name)
 );
+
+CREATE INDEX sponsor_name ON sponsor USING GIN (to_tsvector('english', sponsor_name));
 
 drop table if exists study_to_sponsor;
 create table study_to_sponsor (
