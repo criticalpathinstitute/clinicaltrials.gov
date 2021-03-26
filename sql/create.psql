@@ -44,6 +44,7 @@ create table study (
     enrollment int,
     start_date date,
     completion_date date,
+    all_text text,
     fulltext tsvector,
     record_last_updated timestamp DEFAULT CURRENT_TIMESTAMP,
     unique (nct_id),
