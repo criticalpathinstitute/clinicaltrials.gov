@@ -45,6 +45,7 @@ create table study (
     start_date date,
     completion_date date,
     all_text text,
+    fulltext tsvector,
     record_last_updated timestamp DEFAULT CURRENT_TIMESTAMP,
     unique (nct_id),
     foreign key (phase_id) references phase (phase_id) on delete cascade,
@@ -53,7 +54,7 @@ create table study (
     foreign key (last_known_status_id) references status (status_id) on delete cascade
 );
 
-CREATE INDEX study_text ON study USING GIN (to_tsvector('english', all_text));
+CREATE INDEX study_text ON study USING GIN (fulltext);
 create index study_type_id on study (study_type_id);
 create index phase_id on study (phase_id);
 create index overall_status_id on study (overall_status_id);
@@ -132,4 +133,19 @@ create table study_outcome (
     time_frame text,
     description text,
     foreign key (study_id) references study (study_id) on delete cascade
+);
+
+drop table if exists saved_search;
+create table saved_search (
+    saved_search_id SERIAL PRIMARY KEY,
+    search_name varchar(255) NOT NULL,
+    full_text text NOT NULL DEFAULT '',
+    full_text_bool INT NOT NULL DEFAULT 0,
+    conditions text NOT NULL DEFAULT '',
+    conditions_bool INT NOT NULL DEFAULT 0,
+    sponsors text NOT NULL DEFAULT '',
+    sponsors_bool INT NOT NULL DEFAULT 0,
+    phase_ids text NOT NULL DEFAULT '',
+    study_type_ids text NOT NULL DEFAULT '',
+    enrollment INT NOT NULL DEFAULT 0
 );
