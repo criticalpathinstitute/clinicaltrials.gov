@@ -134,3 +134,18 @@ create table study_outcome (
     description text,
     foreign key (study_id) references study (study_id) on delete cascade
 );
+
+drop table if exists saved_search;
+create table saved_search (
+    saved_search_id SERIAL PRIMARY KEY,
+    search_name varchar(255) NOT NULL,
+    full_text text NOT NULL DEFAULT '',
+    full_text_bool INT NOT NULL DEFAULT 0,
+    conditions text NOT NULL DEFAULT '',
+    conditions_bool INT NOT NULL DEFAULT 0,
+    sponsors text NOT NULL DEFAULT '',
+    sponsors_bool INT NOT NULL DEFAULT 0,
+    phase_ids text NOT NULL DEFAULT '',
+    study_type_ids text NOT NULL DEFAULT '',
+    enrollment INT NOT NULL DEFAULT 0
+);

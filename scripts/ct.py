@@ -1,4 +1,5 @@
 from peewee import *
+from playhouse.postgres_ext import *
 
 database = PostgresqlDatabase('ct')
 
@@ -15,6 +16,9 @@ class Condition(BaseModel):
 
     class Meta:
         table_name = 'condition'
+        indexes = (
+            ((), False),
+        )
 
 class Intervention(BaseModel):
     intervention_id = AutoField()
@@ -30,12 +34,31 @@ class Phase(BaseModel):
     class Meta:
         table_name = 'phase'
 
+class SavedSearch(BaseModel):
+    conditions = TextField(constraints=[SQL("DEFAULT ''::text")])
+    conditions_bool = IntegerField(constraints=[SQL("DEFAULT 0")])
+    enrollment = IntegerField(constraints=[SQL("DEFAULT 0")])
+    full_text = TextField(constraints=[SQL("DEFAULT ''::text")])
+    full_text_bool = IntegerField(constraints=[SQL("DEFAULT 0")])
+    phase_ids = TextField(constraints=[SQL("DEFAULT ''::text")])
+    saved_search_id = AutoField()
+    search_name = CharField()
+    sponsors = TextField(constraints=[SQL("DEFAULT ''::text")])
+    sponsors_bool = IntegerField(constraints=[SQL("DEFAULT 0")])
+    study_type_ids = TextField(constraints=[SQL("DEFAULT ''::text")])
+
+    class Meta:
+        table_name = 'saved_search'
+
 class Sponsor(BaseModel):
     sponsor_id = AutoField()
     sponsor_name = CharField(unique=True)
 
     class Meta:
         table_name = 'sponsor'
+        indexes = (
+            ((), False),
+        )
 
 class Status(BaseModel):
     status_id = AutoField()
@@ -61,10 +84,11 @@ class Study(BaseModel):
     completion_date = DateField(null=True)
     detailed_description = TextField(null=True)
     enrollment = IntegerField(null=True)
+    fulltext = TSVectorField(index=True, null=True)
     has_expanded_access = TextField(null=True)
     keywords = TextField(null=True)
     last_known_status = ForeignKeyField(column_name='last_known_status_id', field='status_id', model=Status)
-    nct_id = CharField(unique=True)
+    nct_id = CharField(index=True)
     official_title = TextField(null=True)
     org_study_id = TextField(null=True)
     overall_status = ForeignKeyField(backref='status_overall_status_set', column_name='overall_status_id', field='status_id', model=Status)
