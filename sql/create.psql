@@ -135,9 +135,19 @@ create table study_outcome (
     foreign key (study_id) references study (study_id) on delete cascade
 );
 
+drop table if exists user;
+create table web_user (
+    web_user_id SERIAL PRIMARY KEY,
+    email varchar(255) NOT NULL,
+    name varchar(255) NOT NULL DEFAULT '',
+    picture varchar(255) NOT NULL DEFAULT '',
+    unique (email)
+);
+
 drop table if exists saved_search;
 create table saved_search (
     saved_search_id SERIAL PRIMARY KEY,
+    web_user_id INT NOT NULL,
     search_name varchar(255) NOT NULL,
     full_text text NOT NULL DEFAULT '',
     full_text_bool INT NOT NULL DEFAULT 0,
@@ -147,5 +157,7 @@ create table saved_search (
     sponsors_bool INT NOT NULL DEFAULT 0,
     phase_ids text NOT NULL DEFAULT '',
     study_type_ids text NOT NULL DEFAULT '',
-    enrollment INT NOT NULL DEFAULT 0
+    enrollment INT NOT NULL DEFAULT 0,
+    email_to varchar(255) NOT NULL DEFAULT '',
+    foreign key (web_user_id) references web_user (web_user_id) on delete cascade
 );
