@@ -34,9 +34,19 @@ class Phase(BaseModel):
     class Meta:
         table_name = 'phase'
 
+class WebUser(BaseModel):
+    email = CharField(unique=True)
+    name = CharField(constraints=[SQL("DEFAULT ''::character varying")])
+    picture = CharField(constraints=[SQL("DEFAULT ''::character varying")])
+    web_user_id = AutoField()
+
+    class Meta:
+        table_name = 'web_user'
+
 class SavedSearch(BaseModel):
     conditions = TextField(constraints=[SQL("DEFAULT ''::text")])
     conditions_bool = IntegerField(constraints=[SQL("DEFAULT 0")])
+    email_to = CharField(constraints=[SQL("DEFAULT ''::character varying")])
     enrollment = IntegerField(constraints=[SQL("DEFAULT 0")])
     full_text = TextField(constraints=[SQL("DEFAULT ''::text")])
     full_text_bool = IntegerField(constraints=[SQL("DEFAULT 0")])
@@ -46,6 +56,7 @@ class SavedSearch(BaseModel):
     sponsors = TextField(constraints=[SQL("DEFAULT ''::text")])
     sponsors_bool = IntegerField(constraints=[SQL("DEFAULT 0")])
     study_type_ids = TextField(constraints=[SQL("DEFAULT ''::text")])
+    web_user = ForeignKeyField(column_name='web_user_id', field='web_user_id', model=WebUser)
 
     class Meta:
         table_name = 'saved_search'
