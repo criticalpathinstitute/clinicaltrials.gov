@@ -44,7 +44,7 @@ create table study (
     enrollment int,
     start_date date,
     completion_date date,
-    all_text text,
+    fulltext_load text,
     fulltext tsvector,
     record_last_updated timestamp DEFAULT CURRENT_TIMESTAMP,
     unique (nct_id),
@@ -160,4 +160,11 @@ create table saved_search (
     enrollment INT NOT NULL DEFAULT 0,
     email_to varchar(255) NOT NULL DEFAULT '',
     foreign key (web_user_id) references web_user (web_user_id) on delete cascade
+);
+
+drop table if exists dataload;
+create table dataload (
+    dataload_id SERIAL PRIMARY KEY,
+    updated_on date,
+    unique (updated_on)
 );
