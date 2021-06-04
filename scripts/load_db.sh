@@ -13,13 +13,13 @@ if [[ ! -d "$DATA_DIR" ]]; then
     echo "Missing DATA DIR \"$DATA_DIR\""
     exit 1
 fi
-OUT_DIR="$DATA_DIR/$(date +"%F")"
-[[ ! -d "$OUT_DIR" ]] && mkdir -p "$OUT_DIR"
+XML_DIR="$DATA_DIR/$(date +"%F")"
+[[ ! -d "$XML_DIR" ]] && mkdir -p "$XML_DIR"
 
 #
 # Download data
 #
-cd "$OUT_DIR"
+cd "$XML_DIR"
 XML_FILE="AllPublicXML.zip"
 [[ ! -f "$XML_FILE" ]] && wget https://clinicaltrials.gov/AllPublicXML.zip
 [[ ! -f "Contents.txt" ]] && unzip "$XML_FILE" # Don't unzip twice
@@ -27,9 +27,11 @@ XML_FILE="AllPublicXML.zip"
 #
 # Load Pg
 #
-LOADER="/usr/local/cpath/clinicaltrials.gov/ctloader/target/release/ctloader"
+LOADER_DIR="/usr/local/cpath/clinicaltrials.gov/ctloader"
+LOADER="$LOADER_DIR/target/release/ctloader"
 if [[ ! -f "$LOADER" ]]; then
     echo "Missing LOADER \"$LOADER\""
     exit 1
 fi
-$LOADER $(pwd)
+cd "$LOADER_DIR" # Need .env file there
+$LOADER "$XML_DIR"
