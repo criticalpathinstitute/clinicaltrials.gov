@@ -79,6 +79,21 @@ create table study_to_condition (
     foreign key (condition_id) references condition (condition_id) on delete cascade
 );
 
+drop table if exists study_design;
+create table study_design (
+    study_design_id SERIAL PRIMARY KEY,
+    study_id INT NOT NULL,
+    allocation text,
+    intervention_model text,
+    intervention_model_description text,
+    primary_purpose text,
+    observational_model text,
+    time_perspective text,
+    masking text,
+    masking_description text,
+    foreign key (study_id) references study (study_id) on delete cascade
+);
+
 drop table if exists study_doc;
 create table study_doc (
     study_doc_id SERIAL PRIMARY KEY,
@@ -122,6 +137,22 @@ create table study_to_sponsor (
     sponsor_id INT NOT NULL,
     foreign key (study_id) references study (study_id) on delete cascade,
     foreign key (sponsor_id) references sponsor (sponsor_id) on delete cascade
+);
+
+drop table if exists study_eligibility;
+create table study_eligibility (
+    study_eligibility_id SERIAL PRIMARY KEY,
+    study_id INT NOT NULL,
+    study_pop text,
+    sampling_method text,
+    criteria text,
+    gender text,
+    gender_based text,
+    gender_description text,
+    minimum_age text,
+    maximum_age text,
+    healthy_volunteers text,
+    foreign key (study_id) references study (study_id) on delete cascade
 );
 
 drop table if exists study_outcome;
