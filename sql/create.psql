@@ -105,6 +105,13 @@ create table study_doc (
     foreign key (study_id) references study (study_id) on delete cascade
 );
 
+create table study_url (
+    study_url_id integer NOT NULL,
+    study_id integer NOT NULL,
+    url text,
+    foreign key (study_id) references study (study_id) on delete cascade
+);
+
 drop table if exists intervention;
 create table intervention (
     intervention_id SERIAL PRIMARY KEY,
@@ -112,7 +119,7 @@ create table intervention (
     unique (intervention_name)
 );
 
-CREATE TABLE study_location (
+create table study_location (
     study_location_id integer NOT NULL,
     study_id integer NOT NULL,
     facility_name character varying(255),
@@ -122,7 +129,7 @@ CREATE TABLE study_location (
     foreign key (study_id) references study (study_id) on delete cascade
 );
 
-CREATE TABLE study_eligibility (
+create table study_eligibility (
     study_eligibility_id integer NOT NULL,
     study_id integer NOT NULL,
     study_pop text,
