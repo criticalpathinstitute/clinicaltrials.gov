@@ -191,7 +191,7 @@ create table study_outcome (
     foreign key (study_id) references study (study_id) on delete cascade
 );
 
-drop table if exists user;
+drop table if exists web_user;
 create table web_user (
     web_user_id SERIAL PRIMARY KEY,
     email varchar(255) NOT NULL,
