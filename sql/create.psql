@@ -112,6 +112,31 @@ create table intervention (
     unique (intervention_name)
 );
 
+CREATE TABLE study_location (
+    study_location_id integer NOT NULL,
+    study_id integer NOT NULL,
+    facility_name character varying(255),
+    status character varying(255),
+    contact_name character varying(255),
+    investigator_name character varying(255),
+    foreign key (study_id) references study (study_id) on delete cascade
+);
+
+CREATE TABLE study_eligibility (
+    study_eligibility_id integer NOT NULL,
+    study_id integer NOT NULL,
+    study_pop text,
+    sampling_method text,
+    criteria text,
+    gender text,
+    gender_based text,
+    gender_description text,
+    minimum_age text,
+    maximum_age text,
+    healthy_volunteers text,
+    foreign key (study_id) references study (study_id) on delete cascade
+);
+
 drop table if exists study_to_intervention;
 create table study_to_intervention (
     study_to_intervention_id SERIAL PRIMARY KEY,
