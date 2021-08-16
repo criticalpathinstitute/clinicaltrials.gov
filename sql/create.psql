@@ -79,6 +79,16 @@ create table study_to_condition (
     foreign key (condition_id) references condition (condition_id) on delete cascade
 );
 
+drop table if exists study_arm_group;
+create table study_arm_group (
+    study_arm_group_id SERIAL PRIMARY KEY,
+    study_id INT NOT NULL,
+    arm_group_label varchar(255) NOT NULL,
+    arm_group_type text,
+    description text,
+    foreign key (study_id) references study (study_id) on delete cascade
+);
+
 drop table if exists study_design;
 create table study_design (
     study_design_id SERIAL PRIMARY KEY,
