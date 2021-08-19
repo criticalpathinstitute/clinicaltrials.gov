@@ -20,6 +20,13 @@ class Condition(BaseModel):
             ((), False),
         )
 
+class Dataload(BaseModel):
+    dataload_id = AutoField()
+    updated_on = DateField(null=True, unique=True)
+
+    class Meta:
+        table_name = 'dataload'
+
 class Intervention(BaseModel):
     intervention_id = AutoField()
     intervention_name = CharField(unique=True)
@@ -50,6 +57,8 @@ class SavedSearch(BaseModel):
     enrollment = IntegerField(constraints=[SQL("DEFAULT 0")])
     full_text = TextField(constraints=[SQL("DEFAULT ''::text")])
     full_text_bool = IntegerField(constraints=[SQL("DEFAULT 0")])
+    interventions = TextField(constraints=[SQL("DEFAULT ''::text")])
+    interventions_bool = IntegerField(constraints=[SQL("DEFAULT 0")])
     phase_ids = TextField(constraints=[SQL("DEFAULT ''::text")])
     saved_search_id = AutoField()
     search_name = CharField()
@@ -87,7 +96,6 @@ class StudyType(BaseModel):
 
 class Study(BaseModel):
     acronym = TextField(null=True)
-    all_text = TextField(null=True)
     biospec_description = TextField(null=True)
     biospec_retention = TextField(null=True)
     brief_summary = TextField(null=True)
@@ -96,6 +104,7 @@ class Study(BaseModel):
     detailed_description = TextField(null=True)
     enrollment = IntegerField(null=True)
     fulltext = TSVectorField(index=True, null=True)
+    fulltext_load = TextField(null=True)
     has_expanded_access = TextField(null=True)
     keywords = TextField(null=True)
     last_known_status = ForeignKeyField(column_name='last_known_status_id', field='status_id', model=Status)
@@ -115,9 +124,31 @@ class Study(BaseModel):
 
     class Meta:
         table_name = 'study'
-        indexes = (
-            ((), False),
-        )
+
+class StudyArmGroup(BaseModel):
+    arm_group_label = CharField()
+    arm_group_type = TextField(null=True)
+    description = TextField(null=True)
+    study_arm_group_id = AutoField()
+    study = ForeignKeyField(column_name='study_id', field='study_id', model=Study)
+
+    class Meta:
+        table_name = 'study_arm_group'
+
+class StudyDesign(BaseModel):
+    allocation = TextField(null=True)
+    intervention_model = TextField(null=True)
+    intervention_model_description = TextField(null=True)
+    masking = TextField(null=True)
+    masking_description = TextField(null=True)
+    observational_model = TextField(null=True)
+    primary_purpose = TextField(null=True)
+    study_design_id = AutoField()
+    study = ForeignKeyField(column_name='study_id', field='study_id', model=Study)
+    time_perspective = TextField(null=True)
+
+    class Meta:
+        table_name = 'study_design'
 
 class StudyDoc(BaseModel):
     doc_comment = TextField(null=True)
@@ -129,6 +160,33 @@ class StudyDoc(BaseModel):
 
     class Meta:
         table_name = 'study_doc'
+
+class StudyEligibility(BaseModel):
+    criteria = TextField(null=True)
+    gender = TextField(null=True)
+    gender_based = TextField(null=True)
+    gender_description = TextField(null=True)
+    healthy_volunteers = TextField(null=True)
+    maximum_age = TextField(null=True)
+    minimum_age = TextField(null=True)
+    sampling_method = TextField(null=True)
+    study_eligibility_id = AutoField()
+    study = ForeignKeyField(column_name='study_id', field='study_id', model=Study)
+    study_pop = TextField(null=True)
+
+    class Meta:
+        table_name = 'study_eligibility'
+
+class StudyLocation(BaseModel):
+    contact_name = CharField(null=True)
+    facility_name = CharField(null=True)
+    investigator_name = CharField(null=True)
+    status = CharField(null=True)
+    study = ForeignKeyField(column_name='study_id', field='study_id', model=Study)
+    study_location_id = AutoField()
+
+    class Meta:
+        table_name = 'study_location'
 
 class StudyOutcome(BaseModel):
     description = TextField(null=True)
@@ -164,4 +222,12 @@ class StudyToSponsor(BaseModel):
 
     class Meta:
         table_name = 'study_to_sponsor'
+
+class StudyUrl(BaseModel):
+    study = ForeignKeyField(column_name='study_id', field='study_id', model=Study)
+    study_url_id = AutoField()
+    url = TextField(null=True)
+
+    class Meta:
+        table_name = 'study_url'
 

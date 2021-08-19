@@ -228,6 +228,8 @@ create table saved_search (
     conditions_bool INT NOT NULL DEFAULT 0,
     sponsors text NOT NULL DEFAULT '',
     sponsors_bool INT NOT NULL DEFAULT 0,
+    interventions text NOT NULL DEFAULT '',
+    interventions_bool INT NOT NULL DEFAULT 0,
     phase_ids text NOT NULL DEFAULT '',
     study_type_ids text NOT NULL DEFAULT '',
     enrollment INT NOT NULL DEFAULT 0,
@@ -241,3 +243,8 @@ create table dataload (
     updated_on date,
     unique (updated_on)
 );
+
+CREATE TRIGGER tsvec_fulltext
+BEFORE INSERT OR UPDATE ON study
+FOR EACH ROW EXECUTE PROCEDURE
+tsvector_update_trigger(fulltext, 'pg_catalog.english', fulltext_load);
