@@ -129,16 +129,18 @@ create table intervention (
     unique (intervention_name)
 );
 
+drop table if exists study_location;
 create table study_location (
     study_location_id SERIAL PRIMARY KEY,
     study_id integer NOT NULL,
-    facility_name character varying(255),
-    status character varying(255),
-    contact_name character varying(255),
-    investigator_name character varying(255),
+    facility_name varchar(255),
+    status text,
+    contact_name text,
+    investigator_name text,
     foreign key (study_id) references study (study_id) on delete cascade
 );
 
+drop table if exists study_eligibility;
 create table study_eligibility (
     study_eligibility_id SERIAL PRIMARY KEY,
     study_id integer NOT NULL,

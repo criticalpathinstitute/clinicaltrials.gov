@@ -1,11 +1,15 @@
 SCHEMA = ./scripts/public.xsd
-DB = ct
+DB = clinical_trial
+DBUSER = kyclark
+DBPASS = mHo%90^NOMgT
+DBHOST = postgres-prod.cnw0jywsbq0l.us-west-2.rds.amazonaws.com
+DBPORT = 5432
 
 reqs:
 	python3 -m pip install -r scripts/requirements.txt
 
 orm:
-	pwiz.py ct > scripts/ct.py
+	pwiz.py --host $(DBHOST) --port $(DBPORT) --user $(DBUSER) --password $(DB) > scripts/ct.py
 
 dump:
 	pg_dump $(DB) > dumps/$(DB).sql

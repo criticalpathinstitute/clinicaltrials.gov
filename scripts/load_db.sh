@@ -16,9 +16,11 @@ fi
 XML_DIR="$DATA_DIR/$(date +"%F")"
 [[ ! -d "$XML_DIR" ]] && mkdir -p "$XML_DIR"
 
+
 #
-# Download data
+# Remove old data and download the latest
 #
+echo "Working in \"$XML_DIR\""
 cd "$XML_DIR"
 XML_FILE="AllPublicXML.zip"
 [[ ! -f "$XML_FILE" ]] && wget https://clinicaltrials.gov/AllPublicXML.zip
@@ -33,5 +35,6 @@ if [[ ! -f "$LOADER" ]]; then
     echo "Missing LOADER \"$LOADER\""
     exit 1
 fi
+
 cd "$LOADER_DIR" # Need .env file there
 $LOADER "$XML_DIR"
