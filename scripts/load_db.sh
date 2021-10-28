@@ -6,21 +6,19 @@
 #
 
 #
-# Make working directory
+# Make working directory, remove old data
 #
 DATA_DIR="/usr/local/cpath/clinicaltrials.gov/data"
-if [[ ! -d "$DATA_DIR" ]]; then
-    echo "Missing DATA DIR \"$DATA_DIR\""
-    exit 1
-fi
+[[ ! -d "$DATA_DIR" ]] && mkdir "$DATA_DIR"
+rm -rf "$DATA_DIR/*"
+
+#
+# Download the latest XML
+#
 XML_DIR="$DATA_DIR/$(date +"%F")"
 [[ ! -d "$XML_DIR" ]] && mkdir -p "$XML_DIR"
-
-
-#
-# Remove old data and download the latest
-#
 echo "Working in \"$XML_DIR\""
+
 cd "$XML_DIR"
 XML_FILE="AllPublicXML.zip"
 [[ ! -f "$XML_FILE" ]] && wget https://clinicaltrials.gov/AllPublicXML.zip
@@ -37,4 +35,9 @@ if [[ ! -f "$LOADER" ]]; then
 fi
 
 cd "$LOADER_DIR" # Need .env file there
-$LOADER "$XML_DIR"
+$LOADER --force "$XML_DIR"
+
+echo "Updating tsvec field"
+SQL="/usr/local/cpath/clinicaltrials.gov/lib/scripts/tsvec.sql"
+HOST="postgres-prod.cnw0jywsbq0l.us-west-2.rds.amazonaws.com"
+psql -h "$HOST" -U kyclark clinical_trial < "$SQL"

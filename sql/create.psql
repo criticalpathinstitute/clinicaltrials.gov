@@ -44,6 +44,8 @@ create table study (
     enrollment int,
     start_date date,
     completion_date date,
+    study_first_posted date,
+    last_update_posted date,
     fulltext_load text,
     fulltext tsvector,
     record_last_updated timestamp DEFAULT CURRENT_TIMESTAMP,
@@ -67,8 +69,6 @@ create table condition (
     condition_name varchar(255) NOT NULL,
     unique (condition_name)
 );
-
-CREATE INDEX condition_name ON condition USING GIN (to_tsvector('english', condition_name));
 
 drop table if exists study_to_condition;
 create table study_to_condition (
@@ -172,8 +172,6 @@ create table sponsor (
     unique (sponsor_name)
 );
 
-CREATE INDEX sponsor_name ON sponsor USING GIN (to_tsvector('english', sponsor_name));
-
 drop table if exists study_to_sponsor;
 create table study_to_sponsor (
     study_to_sponsor_id SERIAL PRIMARY KEY,
@@ -245,6 +243,9 @@ create table dataload (
     updated_on date,
     unique (updated_on)
 );
+
+CREATE INDEX sponsor_name ON sponsor USING GIN (to_tsvector('english', sponsor_name));
+CREATE INDEX condition_name ON condition USING GIN (to_tsvector('english', condition_name));
 
 CREATE TRIGGER tsvec_fulltext
 BEFORE INSERT OR UPDATE ON study

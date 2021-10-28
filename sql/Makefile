@@ -1,12 +1,9 @@
-DB = ct
+DB = clinical_trial
+HOST = postgres-prod.cnw0jywsbq0l.us-west-2.rds.amazonaws.com
 
-db:
-	dropdb $(DB) && createdb $(DB) && psql $(DB) < create.psql
-	# dropdb $(DB) && createdb $(DB) && psql $(DB) < little.psql
+dump:
+	pg_dump --schema-only -f pg_schema.sql -h $(HOST) -U kyclark $(DB)
 
 er:
 	# sqlt-graph -f PostgreSQL -o schema.png create.psql
 	eralchemy -i 'postgresql+psycopg2://kyclark:g0p3rl!@localhost:5432/ct' -o schema.png
-
-dump:
-	pg_dump ct | gzip > ct.pg.gz
